@@ -3,7 +3,11 @@ import pickle
 from hashlib import md5
 
 def StanModel_cache(model_code, model_name=None, **kwargs):
-    """Use just as you would `stan`"""
+    """Use just as you would `stan`
+
+    taken from:
+    https://pystan.readthedocs.io/en/latest/avoiding_recompilation.html
+    """
     code_hash = md5(model_code.encode('ascii')).hexdigest()
     if model_name is None:
         cache_fn = 'cached-model-{}.pkl'.format(code_hash)
