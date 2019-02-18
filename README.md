@@ -12,6 +12,6 @@ python setup.py install
 
 R:
 ```
-cd R/
-not yet implemented
+cd R/bds/
+R -e "devtools::build();devtools::install()"
 ```
