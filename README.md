@@ -12,6 +12,7 @@ python setup.py install
 
 R:
 ```
+./copy-models.sh
 cd R/bds/
 R -e "devtools::build();devtools::install()"
 ```
