@@ -33,24 +33,27 @@ fit = bds.bds(data, lapses=False)
 
 pystan.check_hmc_diagnostics(fit.stanfit)
 
-
 # how to read out results? 
 scale = fit.get_scale_values()
 
 CIl, CIh = fit.get_scale_credible_interval()
 
+import matplotlib.pyplot as plt
+
+# posterior predictive checks
+
+for p in fit.ppc_plot():
+  p.draw();
+  plt.show()
 
 # how to plot results?
-import matplotlib.pyplot as plt
 
 plt.plot(stimulus,scale,'o')
 yerr = [CIh-scale, scale-CIl]
 plt.errorbar(stimulus, scale, yerr=yerr, fmt='none', 
                         ecolor='b', capsize=0)
 
-
-
-
+plt.show()
 # others:
 
 # list of requirements: pystan, numpy,..
