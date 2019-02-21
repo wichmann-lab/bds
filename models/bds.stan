@@ -277,6 +277,6 @@ generated quantities {
   int resp_hat[N] = bernoulli_rng(decision);
 
   for (n in 1:N) {
-    log_lik[n] = bernoulli_lpmf(Resp | decision);
+    log_lik[n] = bernoulli_lpmf(Resp[n] | decision[n]);
   }
 }
