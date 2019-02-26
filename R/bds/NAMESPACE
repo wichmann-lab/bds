@@ -1,0 +1,4 @@
+exportPattern(".")
+
+import("rstan")
+importFrom("methods", "new")
