@@ -310,8 +310,6 @@ generated quantities {
     lapse_log_lik[n] = bernoulli_lpmf(Resp[n] | 0.5);
     model_log_lik[n] = bernoulli_lpmf(Resp[n] | decision[n]);
     
-    log_lik_ratio[n] = lapse_log_lik[n] - model_log_lik[n];
-    
     log_lik[n] = log_mix(lapses,
                          lapse_log_lik[n],
                          model_log_lik[n]);
