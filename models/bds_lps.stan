@@ -236,7 +236,7 @@ transformed data {
  */
 parameters {
   vector<lower=0,upper=1>[K-2] psi;
-  real<lower=0, upper=40> precision;
+  real<lower=precLowest, upper=precHighest> precision;
   real<lower=0, upper=1> lapses;
 }
 
@@ -297,11 +297,12 @@ generated quantities {
   vector[N] log_lik;
   vector[N] lapse_log_lik;
   vector[N] model_log_lik;
+  vector[N] log_lik_sat;
 
   vector[N] log_lik_hat;
   vector[N] lapse_log_lik_hat;
   vector[N] model_log_lik_hat;
-
+  vector[N] log_lik_sat_hat;
   
   int resp_hat[N];
   int lapse_hat[N];
@@ -314,6 +315,8 @@ generated quantities {
                          lapse_log_lik[n],
                          model_log_lik[n]);
 
+    log_lik_sat = log_mix(lapses, lapse_log_lik[n], 0)
+
     lapse_hat[n] = bernoulli_rng(lapses);
     if (lapse_hat[n] == 0) {
       resp_hat[n] = bernoulli_rng(decision[n]);
@@ -325,5 +328,6 @@ generated quantities {
     log_lik_hat[n] = log_mix(lapses,
                              lapse_log_lik[n],
                              model_log_lik[n]);
+    log_lik_sat_hat[n] = log_mix(lapses, lapse_log_lik[n], 0)
   }
 }

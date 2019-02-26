@@ -225,7 +225,7 @@ transformed data {
  */
 parameters {
   vector<lower=0,upper=1>[K-2] psi;
-  real<lower=0,upper=40> precision;
+  real<lower=precLowest,upper=precHighest> precision;
 }
 
 /**
