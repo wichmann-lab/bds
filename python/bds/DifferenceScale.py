@@ -34,6 +34,7 @@ class DifferenceScale:
   def ppc_ordered_residuals(self):
     rhat_pars = ['resp_hat[%d]' % x for x in range(1,self.n+1)]
     ll_pars =   ['log_lik[%d]' % x for x in range(1,self.n+1)]
+    llh_pars =   ['log_lik_hat[%d]' % x for x in range(1,self.n+1)]
     pp = (self.stanfit.to_dataframe(pars=rhat_pars,
                                    inc_warmup=False,
                                    diagnostics=False)
@@ -44,11 +45,16 @@ class DifferenceScale:
                                   diagnostics=False)
           >> select(ll_pars)
          ).T.values
+    ll_hat = (self.stanfit.to_dataframe(pars=llh_pars, 
+                                  inc_warmup=False,
+                                  diagnostics=False)
+          >> select(llh_pars)
+         ).T.values
 
     resp = self.data['Response']
 
     emp_resid = (2.0*np.tile(resp[:, np.newaxis], (1,pp.shape[1]))-1.0) * np.sqrt(-2.0 * ll)
-    sim_resid = (2.0*pp-1.0) * np.sqrt(-2.0 * ll)
+    sim_resid = (2.0*pp-1.0) * np.sqrt(-2.0 * ll_hat)
 
     emp_resid_sorted = np.sort(emp_resid, axis=0)
     sim_resid_sorted = np.sort(sim_resid, axis=0)
@@ -63,7 +69,7 @@ class DifferenceScale:
     sim_df['origin'] = 'simulated'
 
     resids_df = emp_df >> bind_rows(sim_df)
-    resids_df['sortid'] = resids_df.index
+    resids_df['sortid'] = resids_df.index/resids_df.shape[0]*2.0
     resids_df >>= gather('smp', 'residuals', cols) 
 
     def p250(x):
@@ -100,6 +106,7 @@ class DifferenceScale:
   def ppc_residuals_run(self):
     rhat_pars = ['resp_hat[%d]' % x for x in range(1,self.n+1)]
     ll_pars =   ['log_lik[%d]' % x for x in range(1,self.n+1)]
+    llh_pars =   ['log_lik_hat[%d]' % x for x in range(1,self.n+1)]
     dd_pars =   ['decision[%d]' % x for x in range(1,self.n+1)]
     pp = (self.stanfit.to_dataframe(pars=rhat_pars,
                                    inc_warmup=False,
@@ -111,6 +118,11 @@ class DifferenceScale:
                                   diagnostics=False)
           >> select(ll_pars)
          ).T.values
+    ll_hat = (self.stanfit.to_dataframe(pars=llh_pars, 
+                                  inc_warmup=False,
+                                  diagnostics=False)
+          >> select(llh_pars)
+         ).T.values
     dd = (self.stanfit.to_dataframe(pars=dd_pars, 
                                   inc_warmup=False,
                                   diagnostics=False)
@@ -120,7 +132,7 @@ class DifferenceScale:
     resp = self.data['Response']
 
     emp_resid = (2.0*np.tile(resp[:, np.newaxis], (1,pp.shape[1]))-1.0) * np.sqrt(-2.0 * ll)
-    sim_resid = (2.0*pp-1.0) * np.sqrt(-2.0 * ll)
+    sim_resid = (2.0*pp-1.0) * np.sqrt(-2.0 * ll_hat)
 
     def count_revs(a):
       return np.sum(np.abs(np.diff(0.5 * np.sign(a) + 1.0, axis=0)), axis=0)
@@ -140,7 +152,6 @@ class DifferenceScale:
     emp_resid = count_revs(emp_resid)
     sim_resid = count_revs(sim_resid)
 
-    print(emp_resid.shape)
     run_df = (pd.DataFrame({'origin': 'empirical', 'runs': emp_resid})
               >> bind_rows(pd.DataFrame({'origin': 'simulated', 'runs': sim_resid}))
              )

@@ -297,7 +297,11 @@ generated quantities {
   vector[N] log_lik;
   vector[N] lapse_log_lik;
   vector[N] model_log_lik;
-  vector[N] log_lik_ratio;
+
+  vector[N] log_lik_hat;
+  vector[N] lapse_log_lik_hat;
+  vector[N] model_log_lik_hat;
+
   
   int resp_hat[N];
   int lapse_hat[N];
@@ -318,5 +322,10 @@ generated quantities {
     } else {
       resp_hat[n] = bernoulli_rng(0.5);
     }
+    lapse_log_lik_hat[n] = bernoulli_lpmf(resp_hat[n] | 0.5);
+    model_log_lik_hat[n] = bernoulli_lpmf(resp_hat[n] | decision[n]);
+    log_lik_hat[n] = log_mix(lapses,
+                             lapse_log_lik[n],
+                             model_log_lik[n]);
   }
 }
