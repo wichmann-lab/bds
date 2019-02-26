@@ -1,5 +1,6 @@
 *.pkl
 *.tar.gz
+*.Rhistory
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
