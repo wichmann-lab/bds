@@ -53,13 +53,19 @@ bds <- function(mlds_data,
     stimulus <- seq(0,1, len=data$K)
   }
 
+  pkg_folder <- system.file(package="bds")
+  
   if (fit.lapses) {
     data$lpsAlpha <- lpsAlpha
     data$lpsBeta <- lpsBeta
-    stan.file <- system.file("stan", "bds_lps.stan", package="bds")
+    #stan.file <- system.file("stan", "bds_lps.stan", package="bds")
+    modelfile <- "/stan/models/bds_lps.stan"
   } else {
-    stan.file <- system.file("stan", "bds.stan", package="bds")
+    #stan.file <- system.file("stan", "bds.stan", package="bds")
+    modelfile <- "/stan/models/bds.stan"
   }
+  
+  stan.file <- paste(pkg_folder, modelfile, sep="")
 
   bds_model <- stan_model(file=stan.file)
   fit <- sampling(bds_model,
