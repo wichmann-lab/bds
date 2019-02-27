@@ -16,6 +16,8 @@ class DifferenceScale:
       colnames = ['S1', 'S2', 'S3', 'S4', 'Response']
 
     self.data = pd.DataFrame(data, columns=colnames)
+    self.order_data()
+
     self.n = data.shape[0]
 
     self.data.loc[:, 'trial'] = np.arange(1, self.n+1)
@@ -30,8 +32,41 @@ class DifferenceScale:
                                 np.ones((1,summary.shape[1]))], axis=0)
 
     self.precision = stanfit.summary(pars=['precision'], probs=[0.025, 0.25, 0.5, 0.75, 0.975])['summary']
+    self.compute_residuals()
 
-  def ppc_ordered_residuals(self):
+  def order_data(self):
+    if (self.data.shape[1] == 4):
+      for i in range(0, self.data.shape[0]):
+        if self.data.at[i,'S1'] > self.data.at[i, 'S3']:
+          tmp = self.data.at[i, 'S1']
+          self.data.at[i, 'S1'] = self.data.at[i, 'S3']
+          self.data.at[i, 'S3'] = tmp
+
+          self.data.at[i, 'Response'] = 1 - self.data.at[i, 'Response']
+    else:
+      for i in range(0, self.data.shape[0]):
+        if self.data.at['S1'] > self.data.at['S2']:
+          tmp = self.data.at[i, 'S1']
+          self.data.at[i, 'S1'] = self.data.at[i, 'S2']
+          self.data.at[i, 'S2'] = tmp
+
+        if self.data.at['S3'] > self.data.at['S4']:
+          tmp = self.data.at[i, 'S3']
+          self.data.at[i, 'S3'] = self.data.at[i, 'S4']
+          self.data.at[i, 'S4'] = tmp
+
+        if self.data.at[i,'S1'] > self.data.at[i, 'S3']:
+          tmp = self.data.at[i, 'S1']
+          self.data.at[i, 'S1'] = self.data.at[i, 'S3']
+          self.data.at[i, 'S3'] = tmp
+
+          tmp = self.data[i, 'S2']
+          self.data.at[i, 'S2'] = self.data.at[i, 'S4']
+          self.data.at[i, 'S4'] = tmp
+
+          self.data.at[i, 'Response'] = 1 - self.data.at[i, 'Response']
+
+  def compute_residuals(self):
     rhat_pars = ['resp_hat[%d]' % x for x in range(1,self.n+1)]
     ll_pars =   ['log_lik[%d]' % x for x in range(1,self.n+1)]
     llh_pars =  ['log_lik_hat[%d]' % x for x in range(1,self.n+1)]
@@ -55,13 +90,15 @@ class DifferenceScale:
 
     respm = np.tile(resp[:, np.newaxis], (1,pp.shape[1]))
 
-    emp_resid = (2.0*respm-1.0) * np.sqrt(-2.0 * ll)
-    sim_resid = (2.0*pp-1.0) * np.sqrt(-2.0 * ll_hat)
+    self.residuals = (2.0*respm-1.0) * np.sqrt(-2.0 * ll)
+    self.pred_resid = (2.0*pp-1.0) * np.sqrt(-2.0 * ll_hat)
 
-    emp_resid_sorted = np.sort(emp_resid, axis=0)
-    sim_resid_sorted = np.sort(sim_resid, axis=0)
 
-    cols = ['smp[%d]' % x for x in range(0, pp.shape[1])]
+  def ppc_ordered_residuals(self):
+    emp_resid_sorted = np.sort(self.residuals, axis=0)
+    sim_resid_sorted = np.sort(self.pred_resid, axis=0)
+
+    cols = ['smp[%d]' % x for x in range(0, emp_resid_sorted.shape[1])]
     emp_df = pd.DataFrame(data = emp_resid_sorted,
                           columns = cols)
 
@@ -105,7 +142,7 @@ class DifferenceScale:
 
     return (pval[0], ppc_summary)
 
-  def ppc_residuals_run(self):
+  def ppc_residual_run(self):
     rhat_pars = ['resp_hat[%d]' % x for x in range(1,self.n+1)]
     dd_pars =   ['decision[%d]' % x for x in range(1,self.n+1)]
     pp = (self.stanfit.to_dataframe(pars=rhat_pars,
@@ -195,7 +232,7 @@ class DifferenceScale:
   def ppc_plot(self):
     (_, ppc_df) = self.ppc_ordered_residuals()
     (_, rev_df, emp_rev) = self.ppc_flip_count()
-    (_, run_df) = self.ppc_residuals_run()
+    (_, run_df) = self.ppc_residual_run()
 
     return (gg.ggplot(ppc_df, gg.aes(x='residuals_median', y='sortid', color='origin')) +
        gg.geom_line() +
@@ -215,3 +252,42 @@ class LpsDifferenceScale(DifferenceScale):
 
   def __str__(self):
     return super().__str__() + "\nlapse rate:\t" + str(self.lapserate[:,0])
+
+  def compute_residuals(self):
+    rhat_pars = ['resp_hat[%d]' % x for x in range(1,self.n+1)]
+    ll_pars =   ['log_lik[%d]' % x for x in range(1,self.n+1)]
+    llh_pars =  ['log_lik_hat[%d]' % x for x in range(1,self.n+1)]
+    ll_sat_pars =   ['log_lik_sat[%d]' % x for x in range(1,self.n+1)]
+    llh_sat_pars =  ['log_lik_sat_hat[%d]' % x for x in range(1,self.n+1)]
+    pp = (self.stanfit.to_dataframe(pars=rhat_pars,
+                                   inc_warmup=False,
+                                   diagnostics=False)
+          >> select(rhat_pars)
+         ).T.values
+    ll = (self.stanfit.to_dataframe(pars=ll_pars, 
+                                  inc_warmup=False,
+                                  diagnostics=False)
+          >> select(ll_pars)
+         ).T.values
+    ll_hat = (self.stanfit.to_dataframe(pars=llh_pars, 
+                                  inc_warmup=False,
+                                  diagnostics=False)
+          >> select(llh_pars)
+         ).T.values
+    ll_sat = (self.stanfit.to_dataframe(pars=ll_sat_pars, 
+                                  inc_warmup=False,
+                                  diagnostics=False)
+          >> select(ll_sat_pars)
+         ).T.values
+    ll_sat_hat = (self.stanfit.to_dataframe(pars=llh_sat_pars, 
+                                  inc_warmup=False,
+                                  diagnostics=False)
+          >> select(llh_sat_pars)
+         ).T.values
+
+    resp = self.data['Response']
+
+    respm = np.tile(resp[:, np.newaxis], (1,pp.shape[1]))
+
+    self.residuals = (2.0*respm-1.0) * np.sqrt(2.0 * (ll_sat - ll))
+    self.pred_resid = (2.0*pp-1.0) * np.sqrt(2.0 * (ll_sat_hat - ll_hat))

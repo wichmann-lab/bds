@@ -315,7 +315,7 @@ generated quantities {
                          lapse_log_lik[n],
                          model_log_lik[n]);
 
-    log_lik_sat = log_mix(lapses, lapse_log_lik[n], 0)
+    log_lik_sat[n] = log_mix(lapses, lapse_log_lik[n], 0);
 
     lapse_hat[n] = bernoulli_rng(lapses);
     if (lapse_hat[n] == 0) {
@@ -328,6 +328,6 @@ generated quantities {
     log_lik_hat[n] = log_mix(lapses,
                              lapse_log_lik[n],
                              model_log_lik[n]);
-    log_lik_sat_hat[n] = log_mix(lapses, lapse_log_lik[n], 0)
+    log_lik_sat_hat[n] = log_mix(lapses, lapse_log_lik[n], 0);
   }
 }
