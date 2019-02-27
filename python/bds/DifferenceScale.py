@@ -34,7 +34,7 @@ class DifferenceScale:
   def ppc_ordered_residuals(self):
     rhat_pars = ['resp_hat[%d]' % x for x in range(1,self.n+1)]
     ll_pars =   ['log_lik[%d]' % x for x in range(1,self.n+1)]
-    llh_pars =   ['log_lik_hat[%d]' % x for x in range(1,self.n+1)]
+    llh_pars =  ['log_lik_hat[%d]' % x for x in range(1,self.n+1)]
     pp = (self.stanfit.to_dataframe(pars=rhat_pars,
                                    inc_warmup=False,
                                    diagnostics=False)
@@ -53,7 +53,9 @@ class DifferenceScale:
 
     resp = self.data['Response']
 
-    emp_resid = (2.0*np.tile(resp[:, np.newaxis], (1,pp.shape[1]))-1.0) * np.sqrt(-2.0 * ll)
+    respm = np.tile(resp[:, np.newaxis], (1,pp.shape[1]))
+
+    emp_resid = (2.0*respm-1.0) * np.sqrt(-2.0 * ll)
     sim_resid = (2.0*pp-1.0) * np.sqrt(-2.0 * ll_hat)
 
     emp_resid_sorted = np.sort(emp_resid, axis=0)
@@ -105,23 +107,11 @@ class DifferenceScale:
 
   def ppc_residuals_run(self):
     rhat_pars = ['resp_hat[%d]' % x for x in range(1,self.n+1)]
-    ll_pars =   ['log_lik[%d]' % x for x in range(1,self.n+1)]
-    llh_pars =   ['log_lik_hat[%d]' % x for x in range(1,self.n+1)]
     dd_pars =   ['decision[%d]' % x for x in range(1,self.n+1)]
     pp = (self.stanfit.to_dataframe(pars=rhat_pars,
                                    inc_warmup=False,
                                    diagnostics=False)
           >> select(rhat_pars)
-         ).T.values
-    ll = (self.stanfit.to_dataframe(pars=ll_pars, 
-                                  inc_warmup=False,
-                                  diagnostics=False)
-          >> select(ll_pars)
-         ).T.values
-    ll_hat = (self.stanfit.to_dataframe(pars=llh_pars, 
-                                  inc_warmup=False,
-                                  diagnostics=False)
-          >> select(llh_pars)
          ).T.values
     dd = (self.stanfit.to_dataframe(pars=dd_pars, 
                                   inc_warmup=False,
@@ -130,32 +120,24 @@ class DifferenceScale:
          ).T.values
 
     resp = self.data['Response']
-
-    emp_resid = (2.0*np.tile(resp[:, np.newaxis], (1,pp.shape[1]))-1.0) * np.sqrt(-2.0 * ll)
-    sim_resid = (2.0*pp-1.0) * np.sqrt(-2.0 * ll_hat)
+    respm = np.tile(resp[:, np.newaxis], (1,pp.shape[1]))
 
     def count_revs(a):
-      return np.sum(np.abs(np.diff(0.5 * np.sign(a) + 1.0, axis=0)), axis=0)
-
-    def to_bin_sign(a):
-      return 0.5 * np.sign(a) + 0.5
+      return np.sum(np.abs(np.diff(a, axis=0)), axis=0)
 
     for i in range(0, dd.shape[1]):
       sort_index = np.argsort(dd[:,i])
 
-      emp_resid[:,i] = emp_resid[sort_index, i]
-      sim_resid[:,i] = sim_resid[sort_index, i]
+      respm[:,i] = respm[sort_index, i]
+      pp[:,i] = pp[sort_index, i]
 
-    emp_resid = to_bin_sign(emp_resid)
-    sim_resid = to_bin_sign(sim_resid)
+    emp_runs = count_revs(respm)
+    sim_runs = count_revs(pp)
 
-    emp_resid = count_revs(emp_resid)
-    sim_resid = count_revs(sim_resid)
-
-    run_df = (pd.DataFrame({'origin': 'empirical', 'runs': emp_resid})
-              >> bind_rows(pd.DataFrame({'origin': 'simulated', 'runs': sim_resid}))
+    run_df = (pd.DataFrame({'origin': 'empirical', 'runs': emp_runs})
+              >> bind_rows(pd.DataFrame({'origin': 'simulated', 'runs': sim_runs}))
              )
-    pval = np.sum(to_bin_sign(emp_resid - sim_resid))/sim_resid.shape[0]
+    pval = np.sum(np.greater(emp_runs - sim_runs, 0.0))/sim_runs.shape[0]
 
     print('Proportion of runs larger in empirical data:', pval)
 
