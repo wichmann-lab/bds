@@ -45,12 +45,12 @@ class DifferenceScale:
           self.data.at[i, 'Response'] = 1 - self.data.at[i, 'Response']
     else:
       for i in range(0, self.data.shape[0]):
-        if self.data.at['S1'] > self.data.at['S2']:
+        if self.data.at[i, 'S1'] > self.data.at[i, 'S2']:
           tmp = self.data.at[i, 'S1']
           self.data.at[i, 'S1'] = self.data.at[i, 'S2']
           self.data.at[i, 'S2'] = tmp
 
-        if self.data.at['S3'] > self.data.at['S4']:
+        if self.data.at[i, 'S3'] > self.data.at[i, 'S4']:
           tmp = self.data.at[i, 'S3']
           self.data.at[i, 'S3'] = self.data.at[i, 'S4']
           self.data.at[i, 'S4'] = tmp
@@ -229,17 +229,17 @@ class DifferenceScale:
            "\nscale values:\n" + str(self.scale[:,0]) +
            "\nprecision:\t" + str(self.precision[:,0]))
 
-  def ppc_plot(self):
+  def diagnostic_plots(self):
     (_, ppc_df) = self.ppc_ordered_residuals()
-    (_, rev_df, emp_rev) = self.ppc_flip_count()
+#    (_, rev_df, emp_rev) = self.ppc_flip_count()
     (_, run_df) = self.ppc_residual_run()
 
     return (gg.ggplot(ppc_df, gg.aes(x='residuals_median', y='sortid', color='origin')) +
        gg.geom_line() +
        gg.geom_line(gg.aes(x='residuals_p250')) + 
        gg.geom_line(gg.aes(x='residuals_p975')),
-       gg.ggplot(rev_df, gg.aes(x='rhat_count_revs')) +
-       gg.geom_histogram() + gg.geom_vline(gg.aes(xintercept=emp_rev)),
+#       gg.ggplot(rev_df, gg.aes(x='rhat_count_revs')) +
+#       gg.geom_histogram() + gg.geom_vline(gg.aes(xintercept=emp_rev)),
        gg.ggplot(run_df, gg.aes(x='runs', fill='origin')) +
        gg.geom_histogram()
     )
