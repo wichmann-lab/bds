@@ -58,9 +58,9 @@ def bds(mldsdata,
     data['lpsBeta'] = lpsBeta
 
     stanfit = fit_stan_model(modeldir, 'bds_lps', data)
-    result = LpsDifferenceScale(stimulus, stanfit)
+    result = LpsDifferenceScale(stimulus, stanfit, mldsdata)
   else:
     stanfit = fit_stan_model(modeldir, 'bds', data)
-    result = DifferenceScale(stimulus, stanfit)
+    result = DifferenceScale(stimulus, stanfit, mldsdata)
 
   return result
