@@ -225,7 +225,7 @@ transformed data {
  */
 parameters {
   vector<lower=0,upper=1>[K-2] psi;
-  real<lower=0,upper=40> precision;
+  real<lower=precLowest,upper=precHighest> precision;
 }
 
 /**
@@ -272,11 +272,13 @@ model {
  */
 generated quantities {
   vector[N] log_lik;
+  vector[N] log_lik_hat;
 //  int resp_hat[N];
 
   int resp_hat[N] = bernoulli_rng(decision);
 
   for (n in 1:N) {
     log_lik[n] = bernoulli_lpmf(Resp[n] | decision[n]);
+    log_lik_hat[n] = bernoulli_lpmf(resp_hat[n] | decision[n]);
   }
 }
