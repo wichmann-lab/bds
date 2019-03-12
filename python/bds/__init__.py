@@ -28,13 +28,13 @@ def bds(mldsdata,
     data['S3'] = mldsdata[:,1]
     data['S4'] = mldsdata[:,2]
     data['Responses'] = mldsdata[:,3]
-    data['K'] = np.amax(mldsdata[:,0:2])
+    data['K'] = np.amax(mldsdata[:,0:3])
   else:
     data['S2'] = mldsdata[:,1]
     data['S3'] = mldsdata[:,2]
     data['S4'] = mldsdata[:,3]
     data['Responses'] = mldsdata[:,4]
-    data['K'] = np.amax(mldsdata[:,0:3])
+    data['K'] = np.amax(mldsdata[:,0:4])
 
   data['N'] = mldsdata.shape[0]
 
