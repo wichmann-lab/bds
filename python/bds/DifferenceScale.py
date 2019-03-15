@@ -221,6 +221,12 @@ class DifferenceScale:
   def get_scale_credible_interval(self):
     return (self.scale[:,3], self.scale[:,7])
 
+  def get_precision(self):
+    return self.precision[0,0]
+
+  def get_precision_credible_interval(self):
+    return (self.precision[0,3], self.precision[0,7])
+
   def __repr__(self):
     return repr(self.get_scale_values(self))
 
@@ -291,3 +297,9 @@ class LpsDifferenceScale(DifferenceScale):
 
     self.residuals = (2.0*respm-1.0) * np.sqrt(2.0 * (ll_sat - ll))
     self.pred_resid = (2.0*pp-1.0) * np.sqrt(2.0 * (ll_sat_hat - ll_hat))
+
+  def get_lapserate(self):
+    return self.lapserate[0,0]
+
+  def get_lapserate_credible_interval(self):
+    return (self.lapserate[0,3], self.lapserate[0,7])
