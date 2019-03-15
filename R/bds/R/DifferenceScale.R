@@ -92,3 +92,27 @@ diagnostic_plots <- function(scale) {
 
   plot_grid(p1, p2, ncol=2)
 }
+
+get_scale_values <- function(scale) {
+  scale$scale
+}
+
+get_scale_credible_interval <- function(scale) {
+  list(ci.low=scale$scale_summary[,'2.5%'], ci.high=scale$scale_summary[,'97.5%'])
+}
+
+get_precision <- function(scale) {
+  scale$precision
+}
+
+get_precision_credible_interval <- function(scale) {
+  c(ci.low=scale$prec_summary[["2.5%"]], ci.high=scale$prec_summary[["97.5%"]])
+}
+
+get_lapserate <- function(scale) {
+  scale$lapserate
+}
+
+get_lapserate_credible_interval <- function(scale) {
+  c(ci.low=scale$lps_summary[["2.5%"]], ci.high=scale$lps_summary[["97.5%"]])
+}
