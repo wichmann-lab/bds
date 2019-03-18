@@ -17,7 +17,7 @@ df = pd.read_csv('test.csv', sep=' ')
 # order of columns
 # all int? 
 
-data = df[['i1', 'i2', 'i3', 'Response']].values
+data = df[['Response', 'i1', 'i2', 'i3']].values
 
 s =df[['s1', 's2', 's3']].values
 stimulus = np.unique(s.flatten())

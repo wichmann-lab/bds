@@ -11,9 +11,9 @@ class DifferenceScale:
     self.stanfit = stanfit
     self.stimulus = stimulus
     if (data.shape[1] == 4):
-      colnames = ['S1', 'S2', 'S3', 'Response']
+      colnames = ['Response', 'S1', 'S2', 'S3']
     else:
-      colnames = ['S1', 'S2', 'S3', 'S4', 'Response']
+      colnames = ['Response', 'S1', 'S2', 'S3', 'S4']
 
     self.data = pd.DataFrame(data, columns=colnames)
     self.order_data()

@@ -8,7 +8,7 @@ residuals.DifferenceScale <- function(scale, ppc=FALSE) {
     log_lik <- as.matrix(scale$stanfit, pars = paste0('log_lik_hat[', 1:N, ']'))
   } else {
     log_lik <- as.matrix(scale$stanfit, pars = paste0('log_lik[', 1:N, ']'))
-    resp <- matrix(rep(scale$data$Response, each=nrow(log_lik)), ncol=N)
+    resp <- matrix(rep(scale$data$Responses, each=nrow(log_lik)), ncol=N)
   }
   residuals <- (2 * resp - 1) * sqrt(- 2 * log_lik)
 }
@@ -23,7 +23,7 @@ residuals.LpsDifferenceScale <- function(scale, ppc=FALSE) {
   } else {
     log_lik <- as.matrix(scale$stanfit, pars = paste0('log_lik[', 1:N, ']'))
     log_lik_sat <- as.matrix(scale$stanfit, pars = paste0('log_lik_sat[', 1:N, ']'))
-    resp <- matrix(rep(scale$data$Response, each=nrow(log_lik)), ncol=N)
+    resp <- matrix(rep(scale$data$Responses, each=nrow(log_lik)), ncol=N)
   }
   residuals <- (2 * resp - 1) * sqrt(2 * (log_lik_sat - log_lik))
 }
@@ -57,7 +57,7 @@ ppc_residual_run <- function(scale) {
 
   decision <- as.matrix(scale$stanfit, pars = paste0('decision[', 1:N, ']'))
   resp_hat <- as.matrix(scale$stanfit, pars = paste0('resp_hat[', 1:N, ']'))
-  resp <- matrix(rep(scale$data$Response, each=nrow(resp_hat)), ncol=N)
+  resp <- matrix(rep(scale$data$Responses, each=nrow(resp_hat)), ncol=N)
 
   for (n in 1:nrow(resp_hat)) {
     ind <- order(decision[n,])

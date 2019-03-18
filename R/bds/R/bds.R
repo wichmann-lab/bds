@@ -2,32 +2,32 @@ library(rstan)
 
 order_data <- function(mlds_data) {
   if (ncol(mlds_data) == 4) {
-    new.df <- data.frame(S1=numeric(), S2=numeric(), S3=numeric(), Response=numeric())
+    new.df <- data.frame(Response=numeric(), S1=numeric(), S2=numeric(), S3=numeric())
     for (n in 1:nrow(mlds_data)) {
-      if (mlds_data[n,1] > mlds_data[n,3]) {
-        new.df <- rbind(new.df, data.frame(S1=mlds_data[n,3], S2=mlds_data[n,2], S3=mlds_data[n,1], Response=1-mlds_data[n,4]))
+      if (mlds_data[n,2] > mlds_data[n,4]) {
+        new.df <- rbind(new.df, data.frame( Response=1-mlds_data[n,1], S1=mlds_data[n,4], S2=mlds_data[n,3], S3=mlds_data[n,2]))
       } else {
-        new.df <- rbind(new.df, data.frame(S1=mlds_data[n,1], S2=mlds_data[n,2], S3=mlds_data[n,3], Response=mlds_data[n,4]))
+        new.df <- rbind(new.df, data.frame(Response=mlds_data[n,1], S1=mlds_data[n,2], S2=mlds_data[n,3], S3=mlds_data[n,4]))
       }
     }
   } else {
-    new.df <- data.frame(S1=numeric(), S2=numeric(), S3=numeric(), S4=numeric(), Response=numeric())
+    new.df <- data.frame(Response=numeric(), S1=numeric(), S2=numeric(), S3=numeric(), S4=numeric())
     for (n in 1:nrow(mlds_data)) {
-      if (mlds_data[n,1] > mlds_data[n,2]) {
-        s2 <- mlds_data[n,1]
-        s1 <- mlds_data[n,2]
-      } else {
-        s1 <- mlds_data[n,1]
+      if (mlds_data[n,2] > mlds_data[n,3]) {
         s2 <- mlds_data[n,2]
-      }
-      if (mlds_data[n,3] > mlds_data[n,4]) {
-        s4 <- mlds_data[n,3]
-        s3 <- mlds_data[n,4]
+        s1 <- mlds_data[n,3]
       } else {
-        s3 <- mlds_data[n,3]
-        s4 <- mlds_data[n,4]
+        s1 <- mlds_data[n,2]
+        s2 <- mlds_data[n,3]
       }
-      if (mlds_data[n,1] > mlds_data[n,3]) {
+      if (mlds_data[n,4] > mlds_data[n,5]) {
+        s4 <- mlds_data[n,4]
+        s3 <- mlds_data[n,5]
+      } else {
+        s3 <- mlds_data[n,4]
+        s4 <- mlds_data[n,5]
+      }
+      if (mlds_data[n,2] > mlds_data[n,4]) {
         new.df <- rbind(new.df, data.frame(S1=s3, S2=s4, S3=s1, S4=s2, Response=1-mlds_data[n,5]))
       } else {
         new.df <- rbind(new.df, data.frame(S1=s1, S2=s2, S3=s3, S4=s4, Response=mlds_data[n,5]))
@@ -60,19 +60,19 @@ bds <- function(mlds_data,
   )
 
   if (ncol(mlds_data) == 4) {
-    data$S1 <- mlds_data.ordered[,1]
-    data$S2 <- mlds_data.ordered[,2]
-    data$S3 <- mlds_data.ordered[,2]
-    data$S4 <- mlds_data.ordered[,3]
-    data$Responses <- mlds_data.ordered[,4]
-    data$K <- max(mlds_data.ordered[,1:3])
-  } else if(ncol(mlds_data) == 5) {
-    data$S1 <- mlds_data.ordered[,1]
-    data$S2 <- mlds_data.ordered[,2]
+    data$S1 <- mlds_data.ordered[,2]
+    data$S2 <- mlds_data.ordered[,3]
     data$S3 <- mlds_data.ordered[,3]
     data$S4 <- mlds_data.ordered[,4]
-    data$Responses <- mlds_data.ordered[,5]
-    data$K <- max(mlds_data.ordered[,1:4])
+    data$Responses <- mlds_data.ordered[,1]
+    data$K <- max(mlds_data.ordered[,2:4])
+  } else if(ncol(mlds_data) == 5) {
+    data$S1 <- mlds_data.ordered[,2]
+    data$S2 <- mlds_data.ordered[,3]
+    data$S3 <- mlds_data.ordered[,4]
+    data$S4 <- mlds_data.ordered[,5]
+    data$Responses <- mlds_data.ordered[,1]
+    data$K <- max(mlds_data.ordered[,2:5])
   } else {
     stop("Difference scaling data should have 4 or 5 columns!")
   }
