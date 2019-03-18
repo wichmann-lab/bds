@@ -1,9 +1,6 @@
 library(MLDS)
 library(bds)
-library(reticulate)
 library(psyphy)
-
-source('bds.R')
 
 #' Simulate MLDS responses
 #'
@@ -41,6 +38,7 @@ simulate.responses <- function(intensities,
 
   Sc <- scalefun(seq(0, 1, len=intensities))
   sim.lst <- list()
+  sim.lst[['simulations']] <- list()
 
   # Replace responses with randomly sampled coin flips according to lapse rate
   for (n in 1:simulations) {
@@ -66,10 +64,10 @@ simulate.responses <- function(intensities,
       # replace drawn positions with drawn lapses
       responses <- (1-lapse.pos) * responses + lapse.pos * possible.lapses
     }
-    sim.lst[[n]] <- data.frame(resp=responses,S1=Tr[,1], S2=Tr[,2], S3=Tr[,3])
+    sim.lst[['simulations']][[n]] <- data.frame(resp=responses,S1=Tr[,1], S2=Tr[,2], S3=Tr[,3])
   }
-  sim.list[["scale"]] = Sc
-  sim.list[["prec"]] = precision
+  sim.lst[["scale"]] = Sc
+  sim.lst[["prec"]] = precision
   # return list of simulation results
   sim.lst
 }
@@ -106,39 +104,64 @@ asym.bootstrap <- function(asym.fit) {
 
 run.mlds <- function(simlist, lps, levels, function.name, fac=-1) {
   df <- data.frame(sc=numeric(), ci.low=numeric(), ci.high=numeric(), pos=factor(), method=factor(), fn=factor(), lps=numeric())
-  for (sim in simlist) {
-    fit <- mlds(sim, seq(0,1,len=levels))
+  for (sim in simlist[['simulations']]) {
 
-    obs.bt <- boot.mlds(fit, 1000)
+    time.mlds <- system.time({
+      fit <- mlds(sim, seq(0,1,len=levels))
+      obs.bt <- boot.mlds(fit, 10000)
+      obs.diag <- binom.diagnostics(fit, nsim=10000)
 
-    n <- nrow(obs.bt$boot.samp)
-    samples <- apply(obs.bt$boot.samp, 2, function(x) c(x[1:(n-2)], x[n]))
-    obs.low <- apply(samples, 1, quantile, probs = 0.025)
-    obs.high <- apply(samples, 1, quantile, probs = 0.975)
+      pval <- obs.diag$p
+      resid <- apply(obs.diag$resid, 2, quantile, probs=c(0.025, 0.975))
 
-    asym <- tryCatch(psyfun.2asym(cbind(resp, 1 - resp) ~ . - 1,
-                 data = fit$obj$data, link = probit.2asym),
-                    error=function(e) NA)
+      overlap <- mean(resid[1,] < sort(obs.diag$Obs.resid) & resid[2,] > sort(obs.diag$Obs.resid))
 
-    if (!is.na(asym)) {
-      as.co <- c(coef(asym), asym$lambda, asym$gam)
+      n <- nrow(obs.bt$boot.samp)
+      samples <- apply(obs.bt$boot.samp, 2, function(x) c(x[1:(n-2)], x[n]))
+      obs.low <- apply(samples, 1, quantile, probs = 0.025)
+      obs.high <- apply(samples, 1, quantile, probs = 0.975)
+    })
 
-      asym.bt <- asym.bootstrap(asym)
-    } else {
-      as.co <- rep(NA, levels+1)
-      asym.bt <- list(low=rep(NA, times=levels+1), high=rep(NA, times=levels+1))
-    }
+    time.asym <- system.time({
+      asym <- tryCatch(psyfun.2asym(cbind(resp, 1 - resp) ~ . - 1,
+                       data = fit$obj$data, link = probit.2asym),
+                       error=function(e) NA)
 
-    df <- rbind(df, data.frame(sc=c(0, 0, 1, 1, fit$pscale[2:(levels-1)]/fit$pscale[levels], fit$pscale[levels],
-                                    0, 0, 1, 1, as.co[1:(levels-2)]/as.co[levels-1], as.co[(levels-1):(levels+1)]),
-                               gt=c(0, 0, 1, 1, simlist[['scale']][2:(levels-1)], prec,
-                                    simlist[['scale']][2:(levels-1)], simlist['prec'], lps/2, lps/2),
-                               ci.low=c(0, 0, 1, 1, obs.low, asym.bt$low),
-                               ci.high=c(0, 0, 1, 1, obs.high, asym.bt$high),
-                               pos=c(0, 0, levels-1, levels-1, 1:(levels-2), 'sigma', 1:(levels-2), 'sigma', 'lambda', 'gamma'),
-                               method=c('glm', 'asym', 'glm', 'asym', rep('glm', times=levels-1), rep('asym', times=levels+1)),
-                               fn=rep(function.name, times=2*levels+4),
-                               lps=rep(lps, times=2*levels+4), fac=rep(fac, times=2*levels+4)))
+      if (!is.na(asym)) {
+        as.co <- c(coef(asym), asym$lambda, asym$gam)
+
+        asym.bt <- asym.bootstrap(asym)
+      } else {
+        as.co <- rep(NA, levels+1)
+        asym.bt <- list(low=rep(NA, times=levels+1), high=rep(NA, times=levels+1))
+      }
+    })
+
+    utime.mlds <- time.mlds[1] + time.mlds[4]
+    stime.mlds <- time.mlds[2] + time.mlds[5]
+    rtime.mlds <- time.mlds[3]
+
+    utime.asym <- time.asym[1] + time.asym[4]
+    stime.asym <- time.asym[2] + time.asym[5]
+    rtime.asym <- time.asym[3]
+
+    sc <- c(0, 0, 1, 1, fit$pscale[2:(levels-1)]/fit$pscale[levels], fit$pscale[levels], pval, overlap, utime.mlds, stime.mlds, rtime.mlds,
+            as.co[1:(levels-2)]/as.co[levels-1], as.co[(levels-1):(levels+1)], utime.asym, stime.asym, rtime.asym)
+    gt <- c(0, 0, 1, 1, simlist[['scale']][2:(levels-1)], simlist[['prec']], rep(NA, times=5),
+            simlist[['scale']][2:(levels-1)], simlist[['prec']], lps/2, lps/2, rep(NA, times=3))
+    ci.low <- c(0, 0, 1, 1, obs.low, rep(NA, times=5), asym.bt$low, rep(NA, times=3))
+    ci.high <- c(0, 0, 1, 1, obs.high, rep(NA, times=5), asym.bt$high, rep(NA, times=3))
+    pos <- c(0, 0, levels-1, levels-1, 1:(levels-2), 'sigma', 'p-value', 'overlap', 'utime', 'stime', 'rtime', 1:(levels-2), 'sigma', 'lambda', 'gamma', 'utime', 'stime', 'rtime')
+    method <- c('glm', 'asym', 'glm', 'asym', rep('glm', times=levels+4), rep('asym', times=levels+4))
+
+    df <- rbind(df, data.frame(sc=sc,
+                               gt=gt,
+                               ci.low=ci.low,
+                               ci.high=ci.high,
+                               pos=pos,
+                               method=method,
+                               fn=rep(function.name, times=2*levels+12),
+                               lps=rep(lps, times=2*levels+12), fac=rep(fac, times=2*levels+12)))
   }
 
   df
@@ -147,17 +170,35 @@ run.mlds <- function(simlist, lps, levels, function.name, fac=-1) {
 #' Run simple stan model on simulated MLDS experiment
 run.stan <- function(simlist, lps, levels, function.name, fac=-1) {
   df <- data.frame(sc=numeric(), ci.low=numeric(), ci.high=numeric(), pos=factor(), method=factor(), fn=factor(), lps=numeric())
-  for (sim in simlist) {
-    fit <- bds.stan(sim, "bds")
+  for (sim in simlist[['simulations']]) {
+    time.hmc <- system.time({
+      fit <- bds(sim[,c('S1', 'S2', 'S3', 'resp')], fit.lapses = FALSE)
+      overlap <- ppc_ordered_residuals(fit)$pval
+      pval <- ppc_residual_run(fit)$pval
+    })
 
-    df <- rbind(df, data.frame(sc=c(0, fit$point_est[1:(levels-1)], 1),
-                               gt=c(simlist[['scale']], simlist[['prec']]),
-                               ci.low=c(0, fit$hdi.low[1:(levels-1)], 1),
-                               ci.high=c(0, fit$hdi.high[1:(levels-1)], 1),
-                               pos=c(0:levels-1, 'sigma'),
-                               method=rep('stan', times=levels+1),
-                               fn=rep(function.name, times=levels+1),
-                               lps=rep(lps, times=levels+1), fac=rep(fac, times=levels+1)))
+    utime <- time.hmc[1] + time.hmc[4]
+    stime <- time.hmc[2] + time.hmc[5]
+    rtime <- time.hmc[3]
+
+    sampler_params <- get_sampler_params(fit$stanfit, inc_warmup = FALSE)
+    divergent <- mean(sapply(sampler_params, function(x) mean(x[, "divergent__"])))
+
+    sc <- c(get_scale_values(fit), get_precision(fit), pval, overlap, utime, stime, rtime, divergent)
+    gt <- c(simlist[['scale']], simlist[['prec']], NA, NA, NA, NA, NA, NA)
+    ci.low <- c(get_scale_credible_interval(fit)$ci.low, get_precision_credible_interval(fit)$ci.low, NA, NA, NA, NA, NA, NA)
+    ci.high <- c(get_scale_credible_interval(fit)$ci.high, get_precision_credible_interval(fit)$ci.high, NA, NA, NA, NA, NA, NA)
+    pos <- c(0:(levels-1), 'sigma', 'p-value', 'overlap', 'utime', 'stime', 'rtime', 'divergent')
+
+    df <- rbind(df, data.frame(sc=sc,
+                               gt=gt,
+                               ci.low=ci.low,
+                               ci.high=ci.high,
+                               pos=pos,
+                               method=rep('stan', times=levels+7),
+                               fn=rep(function.name, times=levels+7),
+                               lps=rep(lps, times=levels+7),
+                               fac=rep(fac, times=levels+7)))
   }
 
   df
@@ -167,17 +208,35 @@ run.stan <- function(simlist, lps, levels, function.name, fac=-1) {
 run.stan.lapse <- function(simlist, lps, levels, function.name, fac=-1) {
   df <- data.frame(sc=numeric(), ci.low=numeric(), ci.high=numeric(), pos=factor(), method=factor(), fn=factor(), lps=numeric())
 
-  for (sim in simlist) {
-    fit <- bds.stan(sim, "lapse_bds")
+  for (sim in simlist[['simulations']]) {
+    time.hmc <- system.time({
+      fit <- bds(sim[,c('S1', 'S2', 'S3', 'resp')], fit.lapses = TRUE)
+      overlap <- ppc_ordered_residuals(fit)$pval
+      pval <- ppc_residual_run(fit)$pval
+    })
 
-    df <- rbind(df, data.frame(sc=c(0, 1, fit$point_est[1:levels]),
-                               gt=c(0, 1, simlist[['scale']][2:levels-1], simlist[['prec']]),
-                               ci.low=c(0, 1, fit$hdi.low[1:levels]),
-                               ci.high=c(0, 1, fit$hdi.high[1:levels]),
-                               pos=c(0, levels-1, 1:(levels-2), 'sigma', 'lambda'),
-                               method=rep('mixture', times=levels+2),
-                               fn=rep(function.name, times=levels+2),
-                               lps=rep(lps, times=levels+2), fac=rep(fac, times=levels+2)))
+    utime <- time.hmc[1] + time.hmc[4]
+    stime <- time.hmc[2] + time.hmc[5]
+    rtime <- time.hmc[3]
+
+    sampler_params <- get_sampler_params(fit$stanfit, inc_warmup = FALSE)
+    divergent <- mean(sapply(sampler_params, function(x) mean(x[, "divergent__"])))
+
+    sc <- c(get_scale_values(fit), get_precision(fit), get_lapserate(fit), pval, overlap, utime, stime, rtime, divergent)
+    gt <- c(0, simlist[['scale']][2:levels-1], 1, simlist[['prec']], lps, NA, NA, NA, NA, NA, NA)
+    ci.low <- c(get_scale_credible_interval(fit)$ci.low, get_precision_credible_interval(fit)$ci.low, get_lapserate_credible_interval(fit)$ci.low, NA, NA, NA, NA, NA, NA)
+    ci.high <- c(get_scale_credible_interval(fit)$ci.high, get_precision_credible_interval(fit)$ci.high, get_lapserate_credible_interval(fit)$ci.high, NA, NA, NA, NA, NA, NA)
+    pos <- c(0:(levels-1), 'sigma', 'lambda', 'p-value', 'overlap', 'utime', 'stime', 'rtime', 'divergent')
+
+    df <- rbind(df, data.frame(sc=sc,
+                               gt=gt,
+                               ci.low=ci.low,
+                               ci.high=ci.high,
+                               pos=pos,
+                               method=rep('mixture', times=levels+8),
+                               fn=rep(function.name, times=levels+8),
+                               lps=rep(lps, times=levels+8),
+                               fac=rep(fac, times=levels+8)))
   }
 
   df
