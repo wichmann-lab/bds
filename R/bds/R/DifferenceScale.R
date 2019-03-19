@@ -106,7 +106,7 @@ get_precision <- function(scale) {
 }
 
 get_precision_credible_interval <- function(scale) {
-  c(ci.low=scale$prec_summary[["2.5%"]], ci.high=scale$prec_summary[["97.5%"]])
+  list(ci.low=scale$prec_summary[["2.5%"]], ci.high=scale$prec_summary[["97.5%"]])
 }
 
 get_lapserate <- function(scale) {
@@ -114,5 +114,5 @@ get_lapserate <- function(scale) {
 }
 
 get_lapserate_credible_interval <- function(scale) {
-  c(ci.low=scale$lps_summary[["2.5%"]], ci.high=scale$lps_summary[["97.5%"]])
+  list(ci.low=scale$lps_summary[["2.5%"]], ci.high=scale$lps_summary[["97.5%"]])
 }
