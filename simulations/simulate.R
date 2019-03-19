@@ -185,9 +185,9 @@ run.stan <- function(simlist, lps, levels, function.name, fac=-1) {
     divergent <- mean(sapply(sampler_params, function(x) mean(x[, "divergent__"])))
 
     sc <- c(get_scale_values(fit), get_precision(fit), pval, disjoint, utime, stime, rtime, divergent)
-    gt <- c(simlist[['scale']], simlist[['prec']], NA, NA, NA, NA, NA, NA)
-    ci.low <- c(get_scale_credible_interval(fit)$ci.low, get_precision_credible_interval(fit)$ci.low, NA, NA, NA, NA, NA, NA)
-    ci.high <- c(get_scale_credible_interval(fit)$ci.high, get_precision_credible_interval(fit)$ci.high, NA, NA, NA, NA, NA, NA)
+    gt <- c(simlist[['scale']], simlist[['prec']], rep(NA, times=6))
+    ci.low <- c(get_scale_credible_interval(fit)$ci.low, get_precision_credible_interval(fit)$ci.low, rep(NA, times=6))
+    ci.high <- c(get_scale_credible_interval(fit)$ci.high, get_precision_credible_interval(fit)$ci.high, rep(NA, times=6))
     pos <- c(0:(levels-1), 'sigma', 'p-value', 'disjoint', 'utime', 'stime', 'rtime', 'divergent')
 
     df <- rbind(df, data.frame(sc=sc,
@@ -211,7 +211,7 @@ run.stan.lapse <- function(simlist, lps, levels, function.name, fac=-1) {
   for (sim in simlist[['simulations']]) {
     time.hmc <- system.time({
       fit <- bds(sim, fit.lapses = TRUE)
-      overlap <- ppc_ordered_residuals(fit)$pval
+      disjoint <- ppc_ordered_residuals(fit)$disjoint
       pval <- ppc_residual_run(fit)$pval
     })
 
@@ -222,11 +222,11 @@ run.stan.lapse <- function(simlist, lps, levels, function.name, fac=-1) {
     sampler_params <- get_sampler_params(fit$stanfit, inc_warmup = FALSE)
     divergent <- mean(sapply(sampler_params, function(x) mean(x[, "divergent__"])))
 
-    sc <- c(get_scale_values(fit), get_precision(fit), get_lapserate(fit), pval, overlap, utime, stime, rtime, divergent)
-    gt <- c(0, simlist[['scale']][2:levels-1], 1, simlist[['prec']], lps, NA, NA, NA, NA, NA, NA)
-    ci.low <- c(get_scale_credible_interval(fit)$ci.low, get_precision_credible_interval(fit)$ci.low, get_lapserate_credible_interval(fit)$ci.low, NA, NA, NA, NA, NA, NA)
-    ci.high <- c(get_scale_credible_interval(fit)$ci.high, get_precision_credible_interval(fit)$ci.high, get_lapserate_credible_interval(fit)$ci.high, NA, NA, NA, NA, NA, NA)
-    pos <- c(0:(levels-1), 'sigma', 'lambda', 'p-value', 'overlap', 'utime', 'stime', 'rtime', 'divergent')
+    sc <- c(get_scale_values(fit), get_precision(fit), get_lapserate(fit), pval, disjoint, utime, stime, rtime, divergent)
+    gt <- c(simlist[['scale']], simlist[['prec']], lps, rep(NA, times=6))
+    ci.low <- c(get_scale_credible_interval(fit)$ci.low, get_precision_credible_interval(fit)$ci.low, get_lapserate_credible_interval(fit)$ci.low, rep(NA, times=6))
+    ci.high <- c(get_scale_credible_interval(fit)$ci.high, get_precision_credible_interval(fit)$ci.high, get_lapserate_credible_interval(fit)$ci.high, rep(NA, times=6))
+    pos <- c(0:(levels-1), 'sigma', 'lambda', 'p-value', 'disjoint', 'utime', 'stime', 'rtime', 'divergent')
 
     df <- rbind(df, data.frame(sc=sc,
                                gt=gt,
