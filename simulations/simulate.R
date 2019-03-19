@@ -172,8 +172,8 @@ run.stan <- function(simlist, lps, levels, function.name, fac=-1) {
   df <- data.frame(sc=numeric(), ci.low=numeric(), ci.high=numeric(), pos=factor(), method=factor(), fn=factor(), lps=numeric())
   for (sim in simlist[['simulations']]) {
     time.hmc <- system.time({
-      fit <- bds(sim[,c('S1', 'S2', 'S3', 'resp')], fit.lapses = FALSE)
-      overlap <- ppc_ordered_residuals(fit)$pval
+      fit <- bds(sim, fit.lapses = FALSE)
+      disjoint <- ppc_ordered_residuals(fit)$disjoint
       pval <- ppc_residual_run(fit)$pval
     })
 
@@ -184,11 +184,11 @@ run.stan <- function(simlist, lps, levels, function.name, fac=-1) {
     sampler_params <- get_sampler_params(fit$stanfit, inc_warmup = FALSE)
     divergent <- mean(sapply(sampler_params, function(x) mean(x[, "divergent__"])))
 
-    sc <- c(get_scale_values(fit), get_precision(fit), pval, overlap, utime, stime, rtime, divergent)
+    sc <- c(get_scale_values(fit), get_precision(fit), pval, disjoint, utime, stime, rtime, divergent)
     gt <- c(simlist[['scale']], simlist[['prec']], NA, NA, NA, NA, NA, NA)
     ci.low <- c(get_scale_credible_interval(fit)$ci.low, get_precision_credible_interval(fit)$ci.low, NA, NA, NA, NA, NA, NA)
     ci.high <- c(get_scale_credible_interval(fit)$ci.high, get_precision_credible_interval(fit)$ci.high, NA, NA, NA, NA, NA, NA)
-    pos <- c(0:(levels-1), 'sigma', 'p-value', 'overlap', 'utime', 'stime', 'rtime', 'divergent')
+    pos <- c(0:(levels-1), 'sigma', 'p-value', 'disjoint', 'utime', 'stime', 'rtime', 'divergent')
 
     df <- rbind(df, data.frame(sc=sc,
                                gt=gt,
@@ -210,7 +210,7 @@ run.stan.lapse <- function(simlist, lps, levels, function.name, fac=-1) {
 
   for (sim in simlist[['simulations']]) {
     time.hmc <- system.time({
-      fit <- bds(sim[,c('S1', 'S2', 'S3', 'resp')], fit.lapses = TRUE)
+      fit <- bds(sim, fit.lapses = TRUE)
       overlap <- ppc_ordered_residuals(fit)$pval
       pval <- ppc_residual_run(fit)$pval
     })
