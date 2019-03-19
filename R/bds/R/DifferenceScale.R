@@ -47,7 +47,7 @@ ppc_ordered_residuals <- function(scale) {
                              sortid = seq(0, 1, len=ncol(quantiles.sim)))
                   )
 
-  pval <- sum(quantiles.emp[,3] < quantiles.sim[,1] | quantiles.sim[,3] > quantiles.emp[,1]) / nrow(quantiles.emp)
+  pval <- sum(quantiles.emp[,3] < quantiles.sim[,1] | quantiles.sim[,3] < quantiles.emp[,1]) / nrow(quantiles.emp)
 
   list(disjoint=pval, resid_cdf=ppc.df)
 }
