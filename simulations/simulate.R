@@ -114,7 +114,7 @@ run.mlds <- function(simlist, lps, levels, function.name, fac=-1) {
       pval <- obs.diag$p
       resid <- apply(obs.diag$resid, 2, quantile, probs=c(0.025, 0.975))
 
-      overlap <- mean(resid[1,] < sort(obs.diag$Obs.resid) & resid[2,] > sort(obs.diag$Obs.resid))
+      disjoint <- mean(resid[1,] > sort(obs.diag$Obs.resid) | resid[2,] < sort(obs.diag$Obs.resid))
 
       n <- nrow(obs.bt$boot.samp)
       samples <- apply(obs.bt$boot.samp, 2, function(x) c(x[1:(n-2)], x[n]))
@@ -145,13 +145,13 @@ run.mlds <- function(simlist, lps, levels, function.name, fac=-1) {
     stime.asym <- time.asym[2] + time.asym[5]
     rtime.asym <- time.asym[3]
 
-    sc <- c(0, 0, 1, 1, fit$pscale[2:(levels-1)]/fit$pscale[levels], fit$pscale[levels], pval, overlap, utime.mlds, stime.mlds, rtime.mlds,
+    sc <- c(0, 0, 1, 1, fit$pscale[2:(levels-1)]/fit$pscale[levels], fit$pscale[levels], pval, disjoint, utime.mlds, stime.mlds, rtime.mlds,
             as.co[1:(levels-2)]/as.co[levels-1], as.co[(levels-1):(levels+1)], utime.asym, stime.asym, rtime.asym)
     gt <- c(0, 0, 1, 1, simlist[['scale']][2:(levels-1)], simlist[['prec']], rep(NA, times=5),
             simlist[['scale']][2:(levels-1)], simlist[['prec']], lps/2, lps/2, rep(NA, times=3))
     ci.low <- c(0, 0, 1, 1, obs.low, rep(NA, times=5), asym.bt$low, rep(NA, times=3))
     ci.high <- c(0, 0, 1, 1, obs.high, rep(NA, times=5), asym.bt$high, rep(NA, times=3))
-    pos <- c(0, 0, levels-1, levels-1, 1:(levels-2), 'sigma', 'p-value', 'overlap', 'utime', 'stime', 'rtime', 1:(levels-2), 'sigma', 'lambda', 'gamma', 'utime', 'stime', 'rtime')
+    pos <- c(0, 0, levels-1, levels-1, 1:(levels-2), 'sigma', 'p-value', 'disjoint', 'utime', 'stime', 'rtime', 1:(levels-2), 'sigma', 'lambda', 'gamma', 'utime', 'stime', 'rtime')
     method <- c('glm', 'asym', 'glm', 'asym', rep('glm', times=levels+4), rep('asym', times=levels+4))
 
     df <- rbind(df, data.frame(sc=sc,
