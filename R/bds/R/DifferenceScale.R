@@ -32,8 +32,8 @@ ppc_ordered_residuals <- function(scale) {
   resid.emp.sorted <- apply(residuals(scale), 1, sort, na.last=TRUE)
   resid.sim.sorted <- apply(residuals(scale, ppc=TRUE), 1, sort, na.last=TRUE)
 
-  quantiles.emp <- apply(resid.emp.sorted, 1, quantile, probs=c(0.025, 0.5, 0.975))
-  quantiles.sim <- apply(resid.sim.sorted, 1, quantile, probs=c(0.025, 0.5, 0.975))
+  quantiles.emp <- apply(resid.emp.sorted, 1, quantile, probs=c(0.025, 0.5, 0.975), na.rm=TRUE)
+  quantiles.sim <- apply(resid.sim.sorted, 1, quantile, probs=c(0.025, 0.5, 0.975), na.rm=TRUE)
 
   ppc.df <- rbind(data.frame(low = quantiles.emp[1,],
                              m = quantiles.emp[2,],
