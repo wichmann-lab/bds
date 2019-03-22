@@ -247,7 +247,7 @@ class DifferenceScale:
 #       gg.ggplot(rev_df, gg.aes(x='rhat_count_revs')) +
 #       gg.geom_histogram() + gg.geom_vline(gg.aes(xintercept=emp_rev)),
        gg.ggplot(run_df, gg.aes(x='runs', fill='origin')) +
-       gg.geom_histogram()
+       gg.geom_histogram(binwidth=2.0)
     )
 
 class LpsDifferenceScale(DifferenceScale):
