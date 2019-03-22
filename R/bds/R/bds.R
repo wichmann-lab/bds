@@ -37,6 +37,18 @@ order_data <- function(mlds_data) {
   new.df
 }
 
+compile_bds_model <- function(fit.lapses) {
+
+  if (fit.lapses) {
+    modelfile <- "/stan/models/bds_lps.stan"
+  } else {
+    modelfile <- "/stan/models/bds.stan"
+  }
+  stan.file <- paste(pkg_folder, modelfile, sep="")
+
+  model_obj <- stan_model(file=stan.file)
+}
+
 bds <- function(mlds_data,
                 stimulus=NULL,
                 fit.lapses=TRUE,
@@ -45,7 +57,9 @@ bds <- function(mlds_data,
                 precHigh=20,
                 precHighest=30,
                 lpsAlpha=1,
-                lpsBeta=5) {
+                lpsBeta=5,
+                .model_obj=NULL,
+                mc.cores=getOption('mc.cores', default = 1)) {
 
   mlds_data.ordered <- order_data(mlds_data)
 
@@ -86,21 +100,19 @@ bds <- function(mlds_data,
   if (fit.lapses) {
     data$lpsAlpha <- lpsAlpha
     data$lpsBeta <- lpsBeta
-    #stan.file <- system.file("stan", "bds_lps.stan", package="bds")
-    modelfile <- "/stan/models/bds_lps.stan"
-  } else {
-    #stan.file <- system.file("stan", "bds.stan", package="bds")
-    modelfile <- "/stan/models/bds.stan"
   }
 
-  stan.file <- paste(pkg_folder, modelfile, sep="")
+  if (is.null(.model_obj)) {
+    .model_obj <- compile_model(fit.lapses=fit.lapses)
+  }
 
-  bds_model <- stan_model(file=stan.file)
-  fit <- sampling(bds_model,
+
+  fit <- sampling(.model_obj,
                   data=data,
                   iter = 2000, chains=4,
 #                  include = FALSE, pars = c("psi_ext", "decision"),
-                  control = list(adapt_delta = 0.99))
+                  control = list(adapt_delta = 0.99),
+                  mc.cores=mc.cores)
 
   summ <- rstan::summary(fit, probs=c(0.025, 0.25, 0.5, 0.75, 0.975))$summary
 
