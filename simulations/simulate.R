@@ -1,12 +1,17 @@
 library(MLDS)
 library(bds)
 library(psyphy)
+library(foreach)
+library(doParallel)
+
+options(mc.cores=parallel::detectCores())
+registerDoParallel()
 
 #' Simulate MLDS responses
 #'
 #'\code{sum} Simulates responses of a MLDS experiment with a given lapserate.
 #'
-#'@param intensities  number of input intensities
+#'@param intensities  vector of input intensities
 #'@param              trials number of simulated trials in one experiment
 #'@param simulations  number of experiments to simulate
 #'@param precision    height of response function / inverse of the standard
@@ -27,16 +32,17 @@ simulate.responses <- function(intensities,
                                sdt=TRUE) {
 
   # Generate triads corresponding to the number of trials
-  num_triads <- choose(intensities, 3)
+  num_intens <- length(intensities)
+  num_triads <- choose(num_intens, 3)
   repl <- ceiling(trials / num_triads)
-  Tr <- do.call(rbind, replicate(repl, t(combn(intensities,3)), simplify=FALSE))
+  Tr <- do.call(rbind, replicate(repl, t(combn(num_intens,3)), simplify=FALSE))
 
   # If the number of unique triads doesn't divide trials, downsample triads
   if (nrow(Tr) > trials) {
     Tr <- Tr[sample(1:nrow(Tr), trials, replace=FALSE),]
   }
 
-  Sc <- scalefun(seq(0, 1, len=intensities))
+  Sc <- scalefun(intensities)
   sim.lst <- list()
   sim.lst[['simulations']] <- list()
 
@@ -81,7 +87,7 @@ asym.bootstrap <- function(asym.fit) {
   scale <- c(0, sim.coef[1:(lvl-2)]/prec, 1)
 
   fn <- function(x) ifelse(x<1.0, scale[floor(x*lvl)+1], scale[lvl])
-  sim.lst <- simulate.responses(lvl, tr, simulations=1000, precision=prec, lapserate=0.0, scalefun=fn)
+  sim.lst <- simulate.responses(seq(0,1, len=lvl), tr, simulations=10000, precision=prec, lapserate=0.0, scalefun=fn)
 
   bt.fits <- lapply(sim.lst, function(sim) tryCatch(psyfun.2asym(asym.fit$formula,
                                                         data = as.data.frame(as.dm(sim)), link = probit.2asym), error=function(e) NA))
@@ -103,8 +109,7 @@ asym.bootstrap <- function(asym.fit) {
 }
 
 run.mlds <- function(simlist, lps, levels, function.name, fac=-1) {
-  df <- data.frame(sc=numeric(), ci.low=numeric(), ci.high=numeric(), pos=factor(), method=factor(), fn=factor(), lps=numeric())
-  for (sim in simlist[['simulations']]) {
+  df <- foreach(sim = simlist[['simulations']], .combine = rbind) %dopar% {
 
     time.mlds <- system.time({
       fit <- mlds(sim, seq(0,1,len=levels))
@@ -154,14 +159,14 @@ run.mlds <- function(simlist, lps, levels, function.name, fac=-1) {
     pos <- c(0, 0, levels-1, levels-1, 1:(levels-2), 'sigma', 'p-value', 'disjoint', 'utime', 'stime', 'rtime', 1:(levels-2), 'sigma', 'lambda', 'gamma', 'utime', 'stime', 'rtime')
     method <- c('glm', 'asym', 'glm', 'asym', rep('glm', times=levels+4), rep('asym', times=levels+4))
 
-    df <- rbind(df, data.frame(sc=sc,
-                               gt=gt,
-                               ci.low=ci.low,
-                               ci.high=ci.high,
-                               pos=pos,
-                               method=method,
-                               fn=rep(function.name, times=2*levels+12),
-                               lps=rep(lps, times=2*levels+12), fac=rep(fac, times=2*levels+12)))
+    data.frame(sc=sc,
+               gt=gt,
+               ci.low=ci.low,
+               ci.high=ci.high,
+               pos=pos,
+               method=method,
+               fn=rep(function.name, times=2*levels+12),
+               lps=rep(lps, times=2*levels+12), fac=rep(fac, times=2*levels+12))
   }
 
   df
@@ -261,7 +266,7 @@ function.zoo <- list('square'    = function(x) x^2,
 run.simulations <- function(factor.name,
                             functions=function.zoo,
                             lapses=seq(0,0.05,len=6),
-                            levels=list(10),
+                            stimulus=list('10'=seq(0,1, len=10)),
                             num.trials=list(1000),
                             precisions=list(10),
                             num.sims=100,
@@ -270,7 +275,7 @@ run.simulations <- function(factor.name,
 
   if (! file.exists(paste0('data/', factor.name, '.Rdata'))) {
     sim_params <- expand.grid(fn=names(functions),
-                              lvl=levels,
+                              lvl=names(stimulus),
                               tr=num.trials,
                               pr=precisions,
                               lapse=lapses)
@@ -305,7 +310,7 @@ run.simulations <- function(factor.name,
                             lps=numeric(), fac=factor())
 
     # generate simulations for current lapserate
-    sim.lst <- simulate.responses(lvl, tr, simulations=num.sims, precision=pr,
+    sim.lst <- simulate.responses(intensities=stimulus[[lvl]], trials=tr, simulations=num.sims, precision=pr,
                                   scalefun=functions[[fn]], lapserate=lapse,
                                   sdt=sdt)
 
@@ -315,10 +320,10 @@ run.simulations <- function(factor.name,
                   trials=tr,
                   precision=pr,
                   -1)
-
-    invisible(capture.output(lapses.df <- rbind(lapses.df, run.mlds(sim.lst, lapse, lvl, fn, fac=fac))))
-    invisible(capture.output(lapses.df <- rbind(lapses.df, run.stan(sim.lst, lapse, lvl, fn, fac=fac))))
-    invisible(capture.output(lapses.df <- rbind(lapses.df, run.stan.lapse(sim.lst, lapse, lvl, fn, fac=fac))))
+    num.lvl <- length(stimulus[[lvl]])
+    invisible(capture.output(lapses.df <- rbind(lapses.df, run.mlds(sim.lst, lapse, num.lvl, fn, fac=fac))))
+    invisible(capture.output(lapses.df <- rbind(lapses.df, run.stan(sim.lst, lapse, num.lvl, fn, fac=fac))))
+    invisible(capture.output(lapses.df <- rbind(lapses.df, run.stan.lapse(sim.lst, lapse, num.lvl, fn, fac=fac))))
 
     write.table(lapses.df, fcon, row.names=FALSE, col.names = FALSE, sep='\t')
     flush(fcon)
