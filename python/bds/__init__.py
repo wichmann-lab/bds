@@ -56,11 +56,15 @@ def bds(mldsdata,
   if lapses:
     data['lpsAlpha'] = lpsAlpha
     data['lpsBeta'] = lpsBeta
-
-    stanfit = fit_stan_model(modeldir, 'bds_lps', data)
+    init = lambda: {'psi': stimulus[1:-1],
+                    'precision': (precLow + precHigh)/2.0,
+                    'lapses': 0.01}
+    stanfit = fit_stan_model(modeldir, 'bds_lps', data, init)
     result = LpsDifferenceScale(stimulus, stanfit, mldsdata)
   else:
-    stanfit = fit_stan_model(modeldir, 'bds', data)
+    init = lambda: {'psi': stimulus[1:-1],
+                    'precision': (precLow + precHigh)/2.0}
+    stanfit = fit_stan_model(modeldir, 'bds', data, init)
     result = DifferenceScale(stimulus, stanfit, mldsdata)
 
   return result

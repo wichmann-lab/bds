@@ -23,11 +23,15 @@ def StanModel_cache(model_code, model_name=None, **kwargs):
         print("Using cached StanModel")
     return sm
 
-def fit_stan_model(model_dir, model_name, data):
+def fit_stan_model(model_dir, model_name, data, init='random'):
   with open(model_dir + model_name + '.stan', 'r') as model_file:
     model_code = model_file.read()
   model = StanModel_cache(model_code, model_name=model_name)
 
-  fit = model.sampling(data=data, iter=2000, chains=4, control={'adapt_delta': 0.99})
+  fit = model.sampling(data=data,
+                       iter=2000,
+                       chains=4,
+                       control={'adapt_delta': 0.99},
+                       init=init)
 
   return fit

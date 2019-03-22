@@ -25,7 +25,7 @@ stimulus = np.unique(s.flatten())
 
 # how to call the functions?
 
-fit = bds.bds(data)
+fit = bds.bds(data, lapses=False)
 
 # gives warning
 # WARNING:pystan:Maximum (flat) parameter count (1000) exceeded: skipping diagnostic tests for n_eff and Rhat.
