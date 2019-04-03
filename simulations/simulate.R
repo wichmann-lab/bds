@@ -1,11 +1,21 @@
 library(MLDS)
 library(bds)
 library(psyphy)
-library(foreach)
-library(doParallel)
+
+library(parallel)
+library(filelock)
 
 options(mc.cores=parallel::detectCores())
-registerDoParallel()
+rstan_options(auto_write=TRUE)
+
+pkg_folder <- system.file(package="bds")
+bds.path <- "/stan/models/bds.stan"
+lps.path <- "/stan/models/bds_lps.stan"
+
+bds.file <- paste0(pkg_folder, bds.path)
+lps.file <- paste0(pkg_folder, lps.path)
+bds.obj <- stan_model(file=bds.file)
+lps.obj <- stan_model(file=lps.file)
 
 #' Simulate MLDS responses
 #'
@@ -74,6 +84,8 @@ simulate.responses <- function(intensities,
   }
   sim.lst[["scale"]] = Sc
   sim.lst[["prec"]] = precision
+  sim.lst[["lvl"]] = num_intens
+  sim.lst[["trials"]] = trials
   # return list of simulation results
   sim.lst
 }
@@ -108,8 +120,9 @@ asym.bootstrap <- function(asym.fit) {
   list(low=obs.low, high=obs.high)
 }
 
-run.mlds <- function(simlist, lps, levels, function.name, fac=-1) {
-  df <- foreach(sim = simlist[['simulations']], .combine = rbind) %dopar% {
+run.mlds <- function(simlist, lps, levels, function.name) {
+  df <- data.frame(sc=numeric(), ci.low=numeric(), ci.high=numeric(), pos=factor(), method=factor(), fn=factor(), lps=numeric(), lvl=numeric(), trials=numeric(), prec=numeric())
+    for(sim in simlist[['simulations']]) {
 
     time.mlds <- system.time({
       fit <- mlds(sim, seq(0,1,len=levels))
@@ -159,25 +172,28 @@ run.mlds <- function(simlist, lps, levels, function.name, fac=-1) {
     pos <- c(0, 0, levels-1, levels-1, 1:(levels-2), 'sigma', 'p-value', 'disjoint', 'utime', 'stime', 'rtime', 1:(levels-2), 'sigma', 'lambda', 'gamma', 'utime', 'stime', 'rtime')
     method <- c('glm', 'asym', 'glm', 'asym', rep('glm', times=levels+4), rep('asym', times=levels+4))
 
-    data.frame(sc=sc,
+    df <- data.frame(sc=sc,
                gt=gt,
                ci.low=ci.low,
                ci.high=ci.high,
                pos=pos,
                method=method,
                fn=rep(function.name, times=2*levels+12),
-               lps=rep(lps, times=2*levels+12), fac=rep(fac, times=2*levels+12))
+               lps=rep(lps, times=2*levels+12),
+               lvl=rep(simlist[['lvl']], times=2*levels+12),
+               trials=rep(simlist[['trials']], times=2*levels+12),
+               prec=rep(simlist[['prec']], times=2*levels+12))
   }
 
   df
 }
 
 #' Run simple stan model on simulated MLDS experiment
-run.stan <- function(simlist, lps, levels, function.name, fac=-1) {
-  df <- data.frame(sc=numeric(), ci.low=numeric(), ci.high=numeric(), pos=factor(), method=factor(), fn=factor(), lps=numeric())
+run.stan <- function(simlist, lps, levels, function.name) {
+  df <- data.frame(sc=numeric(), ci.low=numeric(), ci.high=numeric(), pos=factor(), method=factor(), fn=factor(), lps=numeric(), lvl=numeric(), trials=numeric(), prec=numeric())
   for (sim in simlist[['simulations']]) {
     time.hmc <- system.time({
-      fit <- bds(sim, fit.lapses = FALSE)
+      fit <- bds(sim, fit.lapses = FALSE, .model_obj = bds.obj, .cores=1)
       disjoint <- ppc_ordered_residuals(fit)$disjoint
       pval <- ppc_residual_run(fit)$pval
     })
@@ -203,19 +219,21 @@ run.stan <- function(simlist, lps, levels, function.name, fac=-1) {
                                method=rep('stan', times=levels+7),
                                fn=rep(function.name, times=levels+7),
                                lps=rep(lps, times=levels+7),
-                               fac=rep(fac, times=levels+7)))
+                               lvl=rep(simlist[['lvl']], times=levels+7),
+                               trials=rep(simlist[['trials']], times=levels+7),
+                               prec=rep(simlist[['prec']], times=levels+7)))
   }
 
   df
 }
 
 #' Run mixture model on simulated MLDS experiment
-run.stan.lapse <- function(simlist, lps, levels, function.name, fac=-1) {
-  df <- data.frame(sc=numeric(), ci.low=numeric(), ci.high=numeric(), pos=factor(), method=factor(), fn=factor(), lps=numeric())
+run.stan.lapse <- function(simlist, lps, levels, function.name) {
+  df <- data.frame(sc=numeric(), ci.low=numeric(), ci.high=numeric(), pos=factor(), method=factor(), fn=factor(), lps=numeric(), lvl=numeric(), trials=numeric(), prec=numeric())
 
   for (sim in simlist[['simulations']]) {
     time.hmc <- system.time({
-      fit <- bds(sim, fit.lapses = TRUE)
+      fit <- bds(sim, fit.lapses = TRUE, .model_obj = lps.obj, .cores=1)
       disjoint <- ppc_ordered_residuals(fit)$disjoint
       pval <- ppc_residual_run(fit)$pval
     })
@@ -241,7 +259,9 @@ run.stan.lapse <- function(simlist, lps, levels, function.name, fac=-1) {
                                method=rep('mixture', times=levels+8),
                                fn=rep(function.name, times=levels+8),
                                lps=rep(lps, times=levels+8),
-                               fac=rep(fac, times=levels+8)))
+                               lvl=rep(simlist[['lvl']], times=levels+8),
+                               trials=rep(simlist[['trials']], times=levels+8),
+                               prec=rep(simlist[['prec']], times=levels+8)))
   }
 
   df
@@ -249,7 +269,7 @@ run.stan.lapse <- function(simlist, lps, levels, function.name, fac=-1) {
 
 munsell <- function(x, ref) ifelse( (x/ref) <= (6. / 29) ^ 3,
                                      11.6 * 841. / 108 * x/ref + 4. / 29 - 1.6,
-                                     11.6* (x/ref)^(1./3)                - 1.6)
+                                     11.6 * (x/ref)^(1./3)               - 1.6)
 
 function.zoo <- list('square'    = function(x) x^2,
                      'id'        = function(x) x,
@@ -263,13 +283,38 @@ function.zoo <- list('square'    = function(x) x^2,
                      'munsell'   = function(x) munsell(x, 1.0)/10
                     )
 
-run.simulations <- function(factor.name,
+run.simulations <- function(fun, stim, fn, lvl, tr, pr, lapse, sdt=FALSE, num.sims=144) {
+  if (! file.exists(paste('data/bds', fn, lvl, tr, pr, lapse, 'sim.csv', sep = '-'))) {
+    lapses.df <- data.frame(sc=numeric(), gt=numeric(), ci.low=numeric(), ci.high=numeric(),
+                            pos=factor(), method=factor(), fn=factor(),
+                            lps=numeric(), lvl=numeric(), trials=numeric(), prec=numeric())
+
+    # generate simulations for current lapserate
+    sim.lst <- simulate.responses(intensities=stim, trials=tr, simulations=num.sims, precision=pr,
+                                  scalefun=fun, lapserate=lapse,
+                                  sdt=sdt)
+
+    num.lvl <- length(stim)
+    lapses.df <- rbind(lapses.df, run.mlds(sim.lst, lapse, num.lvl, fn))
+    lapses.df <- rbind(lapses.df, run.stan(sim.lst, lapse, num.lvl, fn))
+    lapses.df <- rbind(lapses.df, run.stan.lapse(sim.lst, lapse, num.lvl, fn))
+
+    write.table(lapses.df, paste('data/bds', fn, lvl, tr, pr, lapse, 'sim.csv', sep = '-'), row.names=FALSE, sep='\t')
+
+    # run garbage collection to remove memory-intensive stan fits
+    gc()
+  }
+
+  TRUE
+}
+
+simulate <- function(factor.name,
                             functions=function.zoo,
                             lapses=seq(0,0.05,len=6),
                             stimulus=list('10'=seq(0,1, len=10)),
                             num.trials=list(1000),
                             precisions=list(10),
-                            num.sims=100,
+                            num.sims=144,
                             sdt=FALSE) {
 
 
@@ -279,64 +324,35 @@ run.simulations <- function(factor.name,
                               tr=num.trials,
                               pr=precisions,
                               lapse=lapses)
-    next.row <- 1
-    fcon <- file(paste0('data/sim-lapses-x-', factor.name, '.csv'), open='w')
-    write.table(data.frame(sc=numeric(), ci.low=numeric(), ci.high=numeric(),
-                           pos=factor(), method=factor(), fn=factor(),
-                           lps=numeric(), fac=factor()),
-                fcon, sep='\t')
   } else {
-    fcon <- file(paste0('data/sim-lapses-x-', factor.name, '.csv'), open='a')
     load(paste0('data/', factor.name, '.Rdata'))
   }
 
   nsims <- nrow(sim_params)
-  con <- txtProgressBar(min=1,max=nsims,style=3)
 
-  setTxtProgressBar(con, next.row)
-
-  # Run simulations for every lapse rate.
-  # We only look at the last scale value, which should recover the precision
-  # used in the simulation.
-  for (row in next.row:nsims) {
+  # Run simulations for every combination of simulation parameters.
+  run_ <- function(row) {
     fn <- sim_params[row, 'fn']
     lvl <- sim_params[row, 'lvl']
     tr <- sim_params[row, 'tr']
     pr <- sim_params[row, 'pr']
     lapse <- sim_params[row, 'lapse']
 
-    lapses.df <- data.frame(sc=numeric(), gt=numeric(), ci.low=numeric(), ci.high=numeric(),
-                            pos=factor(), method=factor(), fn=factor(),
-                            lps=numeric(), fac=factor())
-
-    # generate simulations for current lapserate
-    sim.lst <- simulate.responses(intensities=stimulus[[lvl]], trials=tr, simulations=num.sims, precision=pr,
-                                  scalefun=functions[[fn]], lapserate=lapse,
-                                  sdt=sdt)
-
-    fac <- switch(factor.name,
-                  level=lvl,
-                  abs=lvl,
-                  trials=tr,
-                  precision=pr,
-                  -1)
-    num.lvl <- length(stimulus[[lvl]])
-    invisible(capture.output(lapses.df <- rbind(lapses.df, run.mlds(sim.lst, lapse, num.lvl, fn, fac=fac))))
-    invisible(capture.output(lapses.df <- rbind(lapses.df, run.stan(sim.lst, lapse, num.lvl, fn, fac=fac))))
-    invisible(capture.output(lapses.df <- rbind(lapses.df, run.stan.lapse(sim.lst, lapse, num.lvl, fn, fac=fac))))
-
-    write.table(lapses.df, fcon, row.names=FALSE, col.names = FALSE, sep='\t')
-    flush(fcon)
-
-    next.row <- next.row + 1
-    save(next.row, sim_params, file=paste0('data/', factor.name, '.Rdata'))
-
-    setTxtProgressBar(con, row)
-
-    # run garbage collection to remove memory-intensive stan fits
-    gc()
+    print(paste('Starting virtual experiment', row, '/', nsims))
+    run.simulations(functions[[fn]], stimulus[[lvl]], fn, lvl, tr, pr, lapse, sdt)
+    print(paste('Finished virtual experiment', row, '/', nsims))
+    TRUE
   }
 
-  close(fcon)
-  close(con)
+  mcmapply(run.simulations,
+         functions[sim_params$fn],
+         stimulus[sim_params$lvl],
+         sim_params$fn,
+         sim_params$lvl,
+         sim_params$tr,
+         sim_params$pr,
+         sim_params$lapse,
+         MoreArgs = list(sdt=sdt, num.sims=num.sims),
+         mc.silent = TRUE,
+         mc.preschedule = FALSE)
 }
