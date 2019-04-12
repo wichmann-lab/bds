@@ -1,19 +1,53 @@
 library(cowplot)
 
-residuals.DifferenceScale <- function(scale, ppc=FALSE) {
-  N <- scale$data$N
+default_extractor <- function(fit, stimulus, data) {
+  summ <- rstan::summary(fit, probs=c(0.025, 0.25, 0.5, 0.75, 0.975))$summary
 
-  if (ppc) {
-    resp <- as.matrix(scale$stanfit, pars = paste0('resp_hat[', 1:N, ']'))
-    log_lik <- as.matrix(scale$stanfit, pars = paste0('log_lik_hat[', 1:N, ']'))
-  } else {
-    log_lik <- as.matrix(scale$stanfit, pars = paste0('log_lik[', 1:N, ']'))
-    resp <- matrix(rep(scale$data$Responses, each=nrow(log_lik)), ncol=N)
-  }
-  residuals <- (2 * resp - 1) * sqrt(- 2 * log_lik)
+  lapserate <- summ['lapses', 'mean']
+  lps_summ <- summ['lapses', ]
+
+  result <- list(
+    stanfit = fit,
+    stimulus = stimulus,
+    scale = c(0.0, summ[paste0('psi[', 1:(data$K-2),']'),'mean'], 1.0),
+    precision = summ['precision','mean'],
+    lapserate = lapserate,
+    scale_summary = rbind(rep(0, times=ncol(summ)),
+                          summ[paste0('psi[', 1:(data$K-2),']'),],
+                          rep(1, times=ncol(summ))),
+    prec_summary = summ['precision',],
+    lps_summary = lps_summ,
+    data = data
+  )
+
+  class(result) <- "DifferenceScale"
+
+  result
 }
 
-residuals.LpsDifferenceScale <- function(scale, ppc=FALSE) {
+extractor_fixed_lapserate <- function(fit, stimulus, data) {
+  summ <- rstan::summary(fit, probs=c(0.025, 0.25, 0.5, 0.75, 0.975))$summary
+
+  result <- list(
+    stanfit = fit,
+    stimulus = stimulus,
+    scale = c(0.0, summ[paste0('psi[', 1:(data$K-2),']'),'mean'], 1.0),
+    precision = summ['precision','mean'],
+    scale_summary = rbind(rep(0, times=ncol(summ)),
+                          summ[paste0('psi[', 1:(data$K-2),']'),],
+                          rep(1, times=ncol(summ))),
+    prec_summary = summ['precision',],
+    lapserate = data$lapses,
+    lps_summary = rep(NA, times=ncol(summ)),
+    data = data
+  )
+
+  class(result) <- "DifferenceScale"
+
+  result
+}
+
+residuals.DifferenceScale <- function(scale, ppc=FALSE) {
   N <- scale$data$N
 
   if (ppc) {
@@ -88,7 +122,7 @@ diagnostic_plots <- function(scale) {
     geom_line(aes(x=low), linetype='dotted') +
     geom_line(aes(x=high), linetype='dotted')
 
-  p2 <- ggplot(runs$runs, aes(x=reversals, fill=origin)) + geom_histogram()
+  p2 <- ggplot(runs$runs, aes(x=reversals, fill=origin)) + geom_histogram(binwidth = 2)
 
   plot_grid(p1, p2, ncol=2)
 }
