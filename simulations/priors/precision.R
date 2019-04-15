@@ -5,10 +5,9 @@ rstan_options(auto_write=TRUE)
 
 # Influence of lapse rate
 # State lapse rates to simulate data for
-lapses <- c(0, 0.05, 0.1)
-num.sims <- 2
-stimulus <- list('11'=c(0, seq(0.025, 0.975, len=9), 1))
-num.trials <- c(2) * choose(length(stimulus[[1]]), 3)
+num.sims <- 100
+stimulus <- c(0, seq(0.025, 0.975, len=9), 1)
+num.trials <- c(2,4,6,8) * choose(length(stimulus[[1]]), 3)
 precision <- c(10)
 
 raised.cos <- build_model(priors=list(psi.uniform, prec.raised_cosine, lapses.const),
@@ -32,12 +31,17 @@ init_fun <- function() {
 }
 init_list <- rep(list(init_fun()), times=4)
 
-run.stan.prec <- function(model_obj, prior_params, simlist, lps, levels, function.name, method) {
+run.stan.prec <- function(model_obj, prior_params, tr, pr, function.name, method) {
   df <- data.frame(sc=numeric(), ci.low=numeric(), ci.high=numeric(), pos=factor(), method=factor(), fn=factor(), lps=numeric(), lvl=numeric(), trials=numeric(), prec=numeric())
-  for (sim in simlist[['simulations']]) {
+  for (i in 1:num.sims) {
 
+    lps <- runif(1, min=0.0, max=0.2)
     prior_params$lapses <- lps
 
+    sl <- simulate.responses(intensities=stimulus, trials=tr, simulations=1, precision=pr,
+                                  scalefun=function.zoo[[function.name]], lapserate=lps,
+                                  sdt=FALSE)
+    sim <- sl[['simlist']][[1]]
     time.hmc <- system.time({
       fitobj <- sample_bds_model(model_obj,
                       sim,
@@ -79,22 +83,17 @@ run.stan.prec <- function(model_obj, prior_params, simlist, lps, levels, functio
   df
 }
 
-run.prec <- function(fun, stim, fn, lvl, tr, pr, lapse, sdt=FALSE, num.sims=144) {
-  if (! file.exists(paste('data/prec', fn, lvl, tr, pr, lapse, 'sim.csv', sep = '-'))) {
+run.prec <- function(fun, fn, tr, pr) {
+  if (! file.exists(paste('data/prec', fn, tr, pr, 'sim.csv', sep = '-'))) {
     lapses.df <- data.frame(sc=numeric(), gt=numeric(), ci.low=numeric(), ci.high=numeric(),
                             pos=factor(), method=factor(), fn=factor(),
                             lps=numeric(), lvl=numeric(), trials=numeric(), prec=numeric())
 
-    # generate simulations for current lapserate
-    sim.lst <- simulate.responses(intensities=stim, trials=tr, simulations=num.sims, precision=pr,
-                                  scalefun=fun, lapserate=lapse,
-                                  sdt=FALSE)
-
-    num.lvl <- length(stim)
-    lapses.df <- rbind(lapses.df, run.stan.prec(raised.cos.model, raised.cos$default_params, sim.lst, lapse, num.lvl, fn, 'raised cosine'))
-    lapses.df <- rbind(lapses.df, run.stan.prec(half.gauss.model, half.gauss$default_params, sim.lst, lapse, num.lvl, fn, 'half-normal'))
-    lapses.df <- rbind(lapses.df, run.stan.prec(uniform.model, uniform$default_params, sim.lst, lapse, num.lvl, fn, 'uniform'))
-    write.table(lapses.df, paste('data/prec', fn, lvl, tr, pr, lapse, 'sim.csv', sep = '-'), row.names=FALSE, sep='\t')
+    num.lvl <- length(stimulus)
+    lapses.df <- rbind(lapses.df, run.stan.prec(raised.cos.model, raised.cos$default_params, tr, pr, fn, 'raised cosine'))
+    lapses.df <- rbind(lapses.df, run.stan.prec(half.gauss.model, half.gauss$default_params, tr, pr, fn, 'half-normal'))
+    lapses.df <- rbind(lapses.df, run.stan.prec(uniform.model, uniform$default_params, tr, pr, fn, 'uniform'))
+    write.table(lapses.df, paste('data/prec', fn, tr, pr, 'sim.csv', sep = '-'), row.names=FALSE, sep='\t')
 
     # run garbage collection to remove memory-intensive stan fits
     gc()
@@ -104,21 +103,15 @@ run.prec <- function(fun, stim, fn, lvl, tr, pr, lapse, sdt=FALSE, num.sims=144)
 }
 
 sim_params <- expand.grid(fn=names(function.zoo),
-                          lvl=names(stimulus),
                           tr=num.trials,
-                          pr=precision,
-                          lps=lapses)
+                          pr=precision)
 
 nsims <- nrow(sim_params)
 
 mcmapply(run.prec,
          function.zoo[sim_params$fn],
-         stimulus[sim_params$lvl],
          sim_params$fn,
-         sim_params$lvl,
          sim_params$tr,
          sim_params$pr,
-         sim_params$lps,
-         MoreArgs = list(num.sims=num.sims),
          mc.silent = TRUE,
          mc.preschedule = FALSE)

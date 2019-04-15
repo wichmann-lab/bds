@@ -3,19 +3,9 @@ library(bds)
 library(psyphy)
 
 library(parallel)
-library(filelock)
 
 options(mc.cores=parallel::detectCores())
 rstan_options(auto_write=TRUE)
-
-pkg_folder <- system.file(package="bds")
-bds.path <- "/stan/models/bds.stan"
-lps.path <- "/stan/models/bds_lps.stan"
-
-bds.file <- paste0(pkg_folder, bds.path)
-lps.file <- paste0(pkg_folder, lps.path)
-bds.obj <- stan_model(file=bds.file)
-lps.obj <- stan_model(file=lps.file)
 
 #' Simulate MLDS responses
 #'
@@ -39,7 +29,7 @@ simulate.responses <- function(intensities,
                                precision=10,
                                lapserate=0.0,
                                scalefun=function(x) x^(1/2),
-                               sdt=TRUE) {
+                               sdt=FALSE) {
 
   # Generate triads corresponding to the number of trials
   num_intens <- length(intensities)
