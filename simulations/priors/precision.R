@@ -1,13 +1,16 @@
 library(bds)
+library(parallel)
 source('../simulate.R')
 
+options(mc.cores=parallel::detectCores())
 rstan_options(auto_write=TRUE)
 
 # Influence of lapse rate
 # State lapse rates to simulate data for
 num.sims <- 100
 stimulus <- c(0, seq(0.025, 0.975, len=9), 1)
-num.trials <- c(2,4,6,8) * choose(length(stimulus[[1]]), 3)
+levels <- length(stimulus)
+num.trials <- c(2) * choose(length(stimulus), 3)
 precision <- c(10)
 
 raised.cos <- build_model(priors=list(psi.uniform, prec.raised_cosine, lapses.const),
@@ -26,7 +29,7 @@ uniform <- build_model(priors=list(psi.uniform, prec.uniform, lapses.const),
 uniform.model <- stan_model(model_code = uniform$model_code)
 
 init_fun <- function() {
-  list(psi = stimulus[[1]][2:(length(stimulus[[1]])-1)],
+  list(psi = stimulus[2:(length(stimulus)-1)],
        precision = 4)
 }
 init_list <- rep(list(init_fun()), times=4)
@@ -41,7 +44,7 @@ run.stan.prec <- function(model_obj, prior_params, tr, pr, function.name, method
     sl <- simulate.responses(intensities=stimulus, trials=tr, simulations=1, precision=pr,
                                   scalefun=function.zoo[[function.name]], lapserate=lps,
                                   sdt=FALSE)
-    sim <- sl[['simlist']][[1]]
+    sim <- sl[['simulations']][[1]]
     time.hmc <- system.time({
       fitobj <- sample_bds_model(model_obj,
                       sim,
@@ -49,7 +52,7 @@ run.stan.prec <- function(model_obj, prior_params, tr, pr, function.name, method
                       init_list=init_list,
                       .cores=1)
 
-      scale <- extractor_fixed_lapserate(fitobj$stanfit, simlist[['scale']], fitobj$data)
+      scale <- extractor_fixed_lapserate(fitobj$stanfit, stimulus, fitobj$data)
       disjoint <- ppc_ordered_residuals(scale)$disjoint
       pval <- ppc_residual_run(scale)$pval
     })
@@ -62,10 +65,10 @@ run.stan.prec <- function(model_obj, prior_params, tr, pr, function.name, method
     divergent <- mean(sapply(sampler_params, function(x) mean(x[, "divergent__"])))
 
     sc <- c(get_scale_values(scale), get_precision(scale), pval, disjoint, utime, stime, rtime, divergent)
-    gt <- c(simlist[['scale']], simlist[['prec']], rep(NA, times=6))
+    gt <- c(stimulus, pr, rep(NA, times=6))
     ci.low <- c(get_scale_credible_interval(scale)$ci.low, get_precision_credible_interval(scale)$ci.low, rep(NA, times=6))
     ci.high <- c(get_scale_credible_interval(scale)$ci.high, get_precision_credible_interval(scale)$ci.high, rep(NA, times=6))
-    pos <- c(0:(levels-1), 'sigma', 'p-value', 'disjoint', 'utime', 'stime', 'rtime', 'divergent')
+    pos <- c(0:(levels - 1), 'sigma', 'p-value', 'disjoint', 'utime', 'stime', 'rtime', 'divergent')
 
     df <- rbind(df, data.frame(sc=sc,
                                gt=gt,
@@ -75,9 +78,9 @@ run.stan.prec <- function(model_obj, prior_params, tr, pr, function.name, method
                                method=rep(method, times=levels+7),
                                fn=rep(function.name, times=levels+7),
                                lps=rep(lps, times=levels+7),
-                               lvl=rep(simlist[['lvl']], times=levels+7),
-                               trials=rep(simlist[['trials']], times=levels+7),
-                               prec=rep(simlist[['prec']], times=levels+7)))
+                               lvl=rep(11, times=levels+7),
+                               trials=rep(tr, times=levels+7),
+                               prec=rep(pr, times=levels+7)))
   }
 
   df
