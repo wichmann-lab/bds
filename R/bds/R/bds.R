@@ -91,7 +91,7 @@ bds <- function(mlds_data,
 
     modelfile <- "/stan/models/bds_lps.stan"
     init_fun <- function() {
-      list(psi = stimulus[2:(length(stimulus)-1)],
+      list(psi = stimulus[2:(length(stimulus)-1)]/stimulus[length(stimulus)],
            precision = (precLow + precHigh)/2.0,
            lapses = 0.01)
     }
@@ -99,7 +99,7 @@ bds <- function(mlds_data,
     modelfile <- "/stan/models/bds.stan"
 
     init_fun <- function() {
-      list(psi = stimulus[2:(length(stimulus)-1)],
+      list(psi = stimulus[2:(length(stimulus)-1)]/stimulus[length(stimulus)],
            precision = (precLow + precHigh)/2.0)
     }
   }
