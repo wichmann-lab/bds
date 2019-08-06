@@ -270,7 +270,7 @@ function.zoo <- list('square'    = function(x) x^2,
                      'exp'       = function(x) 0.05 * ( (1.05/0.05)^x-1),
                      'logit'     = function(x) (tanh(5*(x-0.5)) - tanh(-0.5*5))/(tanh(5*0.5) - tanh(-0.5*5)),
                      'invlogit'  = function(x) atanh((tanh(5*0.5) - tanh(-0.5*5))*x + tanh(-0.5*5))/5 + 0.5,
-                     'munsell'   = function(x) munsell(x, 1.0)/10
+                     'munsell'   = function(x) (munsell(x, 1.0)-munsell(0.0, 1.0))/(munsell(1.0, 1.0)-munsell(0.0, 1.0))
                     )
 
 run.simulations <- function(fun, stim, fn, lvl, tr, pr, lapse, sdt=FALSE, num.sims=144) {

@@ -9,18 +9,19 @@ num.sims <- 100
 stimulus <- c(0, seq(0.025, 0.975, len=9), 1)
 num.trials <- c(2,4,6,8) * choose(length(stimulus), 3)
 precision <- c(10)
+lapserate <- seq(0, 0.2, len=10)
 
-raised.cos <- build_model(priors=list(psi.uniform, prec.raised_cosine, lapses.const),
+beta <- build_model(priors=list(psi.uniform, prec.raised_cosine, lapses.beta),
                           model=bds.model,
                           extractor_function = extractor_fixed_lapserate)
-raised.cos.model <- stan_model(model_code = raised.cos$model_code)
+beta.model <- stan_model(model_code = beta$model_code)
 
-half.gauss <- build_model(priors=list(psi.uniform, prec.halfgauss, lapses.const),
+fixed <- build_model(priors=list(psi.uniform, prec.raised_cosine, lapses.const),
                           model=bds.model,
                           extractor_function = extractor_fixed_lapserate)
-half.gauss.model <- stan_model(model_code = half.gauss$model_code)
+fixed.model <- stan_model(model_code = fixed$model_code)
 
-uniform <- build_model(priors=list(psi.uniform, prec.uniform, lapses.const),
+uniform <- build_model(priors=list(psi.uniform, prec.raised_cosine, lapses.uniform),
                           model=bds.model,
                           extractor_function = extractor_fixed_lapserate)
 uniform.model <- stan_model(model_code = uniform$model_code)
