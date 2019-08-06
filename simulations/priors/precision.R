@@ -10,8 +10,8 @@ rstan_options(auto_write=TRUE)
 num.sims <- 100
 stimulus <- c(0, seq(0.025, 0.975, len=9), 1)
 levels <- length(stimulus)
-num.trials <- c(2) * choose(length(stimulus), 3)
-precision <- c(10)
+num.trials <- c(2, 4, 6, 8) * choose(length(stimulus), 3)
+precision <- c(2.5, 5, 10, 15, 20)
 
 raised.cos <- build_model(priors=list(psi.uniform, prec.raised_cosine, lapses.const),
                           model=bds.model,
@@ -34,17 +34,13 @@ init_fun <- function() {
 }
 init_list <- rep(list(init_fun()), times=4)
 
-run.stan.prec <- function(model_obj, prior_params, tr, pr, function.name, method) {
+run.stan.prec <- function(model_obj, prior_params, sim.lst, lps.lst, tr, pr, function.name, method) {
   df <- data.frame(sc=numeric(), ci.low=numeric(), ci.high=numeric(), pos=factor(), method=factor(), fn=factor(), lps=numeric(), lvl=numeric(), trials=numeric(), prec=numeric())
   for (i in 1:num.sims) {
-
-    lps <- runif(1, min=0.0, max=0.2)
+    sim <- sim.lst[[i]]
+    lps <- lps.lst[[i]]
     prior_params$lapses <- lps
 
-    sl <- simulate.responses(intensities=stimulus, trials=tr, simulations=1, precision=pr,
-                                  scalefun=function.zoo[[function.name]], lapserate=lps,
-                                  sdt=FALSE)
-    sim <- sl[['simulations']][[1]]
     time.hmc <- system.time({
       fitobj <- sample_bds_model(model_obj,
                       sim,
@@ -93,9 +89,21 @@ run.prec <- function(fun, fn, tr, pr) {
                             lps=numeric(), lvl=numeric(), trials=numeric(), prec=numeric())
 
     num.lvl <- length(stimulus)
-    lapses.df <- rbind(lapses.df, run.stan.prec(raised.cos.model, raised.cos$default_params, tr, pr, fn, 'raised cosine'))
-    lapses.df <- rbind(lapses.df, run.stan.prec(half.gauss.model, half.gauss$default_params, tr, pr, fn, 'half-normal'))
-    lapses.df <- rbind(lapses.df, run.stan.prec(uniform.model, uniform$default_params, tr, pr, fn, 'uniform'))
+
+    lps.lst <- list()
+    sim.lst <- list()
+    for (i in 1:num.sims) {
+      lps.lst[[i]] <- runif(1, min=0.0, max=0.2)
+      
+      sl <- simulate.responses(intensities=stimulus, trials=tr, simulations=1, precision=pr,
+                                  scalefun=function.zoo[[fn]], lapserate=lps.lst[[i]],
+                                  sdt=FALSE)
+    sim.lst[[i]] <- sl[['simulations']][[1]]
+    }
+    
+    lapses.df <- rbind(lapses.df, run.stan.prec(raised.cos.model, raised.cos$default_params, sim.lst, lps.lst, tr, pr, fn, 'raised cosine'))
+    lapses.df <- rbind(lapses.df, run.stan.prec(half.gauss.model, half.gauss$default_params, sim.lst, lps.lst, tr, pr, fn, 'half-normal'))
+    lapses.df <- rbind(lapses.df, run.stan.prec(uniform.model, uniform$default_params, sim.lst, lps.lst, tr, pr, fn, 'uniform'))
     write.table(lapses.df, paste('data/prec', fn, tr, pr, 'sim.csv', sep = '-'), row.names=FALSE, sep='\t')
 
     # run garbage collection to remove memory-intensive stan fits
@@ -117,4 +125,4 @@ mcmapply(run.prec,
          sim_params$tr,
          sim_params$pr,
          mc.silent = TRUE,
-         mc.preschedule = FALSE)
+         mc.preschedule = TRUE)
