@@ -27,13 +27,13 @@ class GaussianProcess(ScaleModel):
   vector[N_predict-2] y_mean = (cov_ub / cov_bb) * fix_points;
 
   matrix[N_predict-2, N_predict-2] L_cov = cholesky_decompose(cov_all[2:N_predict-1, 2:N_predict-1] - (cov_ub / cov_bb) * cov_ub');
-  vector[N_predict-2] log_psi_predict = y_mean + L_cov * psi_tilde;""")
+  vector[N_predict-2] psi_predict = y_mean + L_cov * psi_tilde;""")
 
     self.param_transform = (
 """  psi[1] = 0;
   psi[K] = 1;
   for (k in 2:K-1) {
-    psi[k] = log_psi_predict[obs_idx[k-1]-1];
+    psi[k] = psi_predict[obs_idx[k-1]-1];
   }""")
 
     self.model_code = "  psi_tilde ~ normal(0, 1);"
@@ -56,7 +56,7 @@ class GaussianProcess(ScaleModel):
     result_obj.stimulus = result_obj.stan_data['x_predict']
 
   def scale_values(self, result_obj):
-    scale_pars = ['psi[1]'] + ['log_psi_predict[%d]' % x for x in range(1,result_obj.stan_data['N_predict']-1)] + ['psi[%d]' % result_obj.k]
+    scale_pars = ['psi[1]'] + ['psi_predict[%d]' % x for x in range(1,result_obj.stan_data['N_predict']-1)] + ['psi[%d]' % result_obj.k]
     scale_vals = (result_obj.stan_fit.to_dataframe(pars=scale_pars, 
                                   inc_warmup=False,
                                   diagnostics=False)

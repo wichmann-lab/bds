@@ -24,21 +24,17 @@ gp_model = BDSModel('bds_gp',
                     likelihood = BinomialMixture(lapses_prior=BetaDistribution('lapses', {'lapsesAlpha': 1, 'lapsesBeta': 10})),
                     regressor = DifferenceModel(link=ProbitLink(),
                                                  sensitivity_prior=RaisedCosineDistribution('sensitivity', {'sensitivityLowest': 0, 'sensitivityLow': 2.5, 'sensitivityHigh': 25, 'sensitivityHighest': 50})),
-                    scale = GaussianProcess(length_scale_prior = RaisedCosineDistribution('rho', {'rhoLowest': 0, 'rhoLow': 1, 'rhoHigh': 3, 'rhoHighest': 10}),
-                                            magnitude_prior = HalfNormalDistribution('alpha', {'alphaSigma': 10})))
+                    scale = GaussianProcess(length_scale_prior = HalfNormalDistribution('rho', {'rhoSigma': 2}),
+                                            magnitude_prior = HalfNormalDistribution('alpha', {'alphaSigma': 2})))
 
 def bds(data, stimulus=None, **kwargs):
 
-#  result = default_model.sample(data, stimulus, **kwargs)
+  result = default_model.sample(data, stimulus, **kwargs)
 
-  gp_dict = {'N_predict': 100,
-             'x_predict': np.concatenate([stimulus[:-1], np.linspace(stimulus[0], stimulus[-1], num=100-stimulus.shape[0]+2)[1:]]),
-             'obs_idx': np.array(range(2, stimulus.shape[0])),
-             'rho': 0.5*(stimulus[-1]-stimulus[0])}
+#  gp_dict = {'N_predict': 100,
+#             'x_predict': np.concatenate([stimulus[:-1], np.linspace(stimulus[0], stimulus[-1], num=100-stimulus.shape[0]+2)[1:]]),
+#             'obs_idx': np.array(range(2, stimulus.shape[0])),
+#             'rho': 0.5*(stimulus[-1]-stimulus[0])}
 
-  print(gp_dict['x_predict'])
-
-  init = lambda: dict({'psi_tilde': gp_dict['x_predict'][1:-1]})
-
-  result = gp_model.sample(data, stimulus, params=gp_dict)
+#  result = gp_model.sample(data, stimulus, params=gp_dict)
   return result
