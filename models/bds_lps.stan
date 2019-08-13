@@ -171,14 +171,14 @@ functions {
  * @param Responses.
  *            observer responses; 0 for left, 1 for right
  *            interval
- * @param precLowest
- *            lowest possible value of precision (prior parameter)
- * @param precLow
- *            lowest reasonable value of precision (prior parameter)
- * @param precHigh
- *            highest reasonable value of precision (prior parameter)
- * @param precHighest
- *            highest possible value of precision (prior parameter)
+ * @param sensLowest
+ *            lowest possible value of sensitivity (prior parameter)
+ * @param sensLow
+ *            lowest reasonable value of sensitivity (prior parameter)
+ * @param sensHigh
+ *            highest reasonable value of sensitivity (prior parameter)
+ * @param sensHighest
+ *            highest possible value of sensitivity (prior parameter)
  * @param lpsAlpha
  *            parameter of Beta distribution prior on lapse rate
  * @param lpsBeta
@@ -193,11 +193,11 @@ data {
   int<lower=1, upper=K> S4[N];
   int<lower=0, upper=1> Responses[N];  // response variable
   
-  // hyper-parameters for precision prior (uniform with cosine falloff)
-  real precLowest;
-  real<lower=precLowest> precHighest;
-  real<lower=precLowest, upper=precHighest> precLow;
-  real<lower=precLow, upper=precHighest> precHigh;
+  // hyper-parameters for sensitivity prior (uniform with cosine falloff)
+  real sensLowest;
+  real<lower=sensLowest> sensHighest;
+  real<lower=sensLowest, upper=sensHighest> sensLow;
+  real<lower=sensLow, upper=sensHighest> sensHigh;
   
   // hyper-parameters for lapse rate prior (beta distribution)
   real<lower=0> lpsAlpha;
@@ -228,15 +228,15 @@ transformed data {
  * @param psi 
  *        vector of scale values to be estimated
  *        constrained to lay between 0 and 1
- * @param precision
+ * @param sensitivity
  *        inverse of the standard deviation of the
  *        decision noise
  * @param lapses
  *        rate of stimulus-independent observer errors
  */
 parameters {
-  vector<lower=0,upper=1>[K-2] psi;
-  real<lower=precLowest, upper=precHighest> precision;
+  simplex[K-1] psi_diff;
+  real<lower=sensLowest, upper=sensHighest> sensitivity;
   real<lower=0, upper=1> lapses;
 }
 
@@ -246,23 +246,23 @@ parameters {
  * The decision probability is computed by passing the decision variable
  * through the cumulative normal function.
  * The decision variable itself is the product between the design matrix
- * and the scale values scaled by the precision of the decision noise.
+ * and the scale values scaled by the sensitivity of the decision noise.
  */
 transformed parameters {
   vector[N] decision;
-  vector[K-1] psi_ext;
+  vector[K-1] psi;
 
-  for (k in 1:K-2) {
-    psi_ext[k] = psi[k];
+  psi[1] = psi_diff[1];
+  for (k in 2:K-1) {
+    psi[k] = psi[k-1] + psi_diff[k];
   }
-  psi_ext[K-1] = 1;
 
-  decision = Phi(X * psi_ext * precision);
+  decision = Phi(X * psi * sensitivity);
 }
 
 /**
  * The scale values have an implicit uniform prior.
- * The precision of the decision noise has a custom
+ * The sensitivity of the decision noise has a custom
  * uniform prior with cosine falloff.
  *
  * The likelihood computes as the outcome of one Bernoulli
@@ -270,7 +270,8 @@ transformed parameters {
  */
 model {
   // priors
-  precision ~ raised_cosine(precLowest, precLow, precHigh, precHighest);
+  psi_diff ~ dirichlet(rep_vector(1.0, K-1));
+  sensitivity ~ raised_cosine(sensLowest, sensLow, sensHigh, sensHighest);
   lapses ~ beta(lpsAlpha, lpsBeta);
 
   // likelihood including all constants

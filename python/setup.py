@@ -1,9 +1,8 @@
-from distutils.core import setup
+from setuptools import setup, find_packages
 setup(
     name="bds",
-    version="0.1",
-    packages=['bds'],
-    data_files = [('share/models', ['../models/bds.stan', '../models/bds_lps.stan'])],
+    version="0.2a0",
+    packages=find_packages(),
     author='Bernhard Lang',
     author_email='bernhard.lang@student.uni-tuebingen.de',
     url='https://www.github.com/wichmann-lab/bds'

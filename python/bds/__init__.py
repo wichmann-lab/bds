@@ -1,70 +1,44 @@
 import numpy as np
 import os
 
-from bds.DifferenceScale import *
-from bds.stan_helpers import fit_stan_model
+from .DifferenceScale import *
+from .BDSModel import BDSModel
+from .likelihood import *
+from .regressor import *
+from .prior import *
+from .scale import *
 
-def bds(mldsdata,
-        stimulus=None,
-        lapses=True,
-        precLowest=0,
-        precLow=2,
-        precHigh=20,
-        precHighest=30,
-        lpsAlpha=1,
-        lpsBeta=5):
+default_model = BDSModel('bds',
+                         likelihood = BinomialMixture(lapses_prior=BetaDistribution('lapses', {'lapsesAlpha': 1, 'lapsesBeta': 10})),
+                         regressor = LinearModel(link=ProbitLink(),
+                                                 sensitivity_prior=RaisedCosineDistribution('sensitivity', {'sensitivityLowest': 0, 'sensitivityLow': 2.5, 'sensitivityHigh': 25, 'sensitivityHighest': 50})),
+                         scale = MonotonicScale(diff_prior=DirichletDistribution('psi_diff', 'K-1', {'psi_diffAlpha': 1})))
 
-  if mldsdata.shape[1] != 4 and mlds.data.shape[1] != 5:
-    raise ValueError('MLDS data should have 4 or 5 columns!')
+diff_model = BDSModel('bds_diff',
+                         likelihood = BinomialMixture(lapses_prior=BetaDistribution('lapses', {'lapsesAlpha': 1, 'lapsesBeta': 10})),
+                         regressor = DifferenceModel(link=ProbitLink(),
+                                                 sensitivity_prior=RaisedCosineDistribution('sensitivity', {'sensitivityLowest': 0, 'sensitivityLow': 2.5, 'sensitivityHigh': 25, 'sensitivityHighest': 50})),
+                         scale = ParameterScale(scale_prior=VectorizedUniformDistribution('psi_hat', 'K-2', {'psi_hatStart': 0.0, 'psi_hatEnd': 1.0})))
 
-  modelname = 'bds'
-  data = dict()
+gp_model = BDSModel('bds_gp',
+                    likelihood = BinomialMixture(lapses_prior=BetaDistribution('lapses', {'lapsesAlpha': 1, 'lapsesBeta': 10})),
+                    regressor = DifferenceModel(link=ProbitLink(),
+                                                 sensitivity_prior=RaisedCosineDistribution('sensitivity', {'sensitivityLowest': 0, 'sensitivityLow': 2.5, 'sensitivityHigh': 25, 'sensitivityHighest': 50})),
+                    scale = GaussianProcess(length_scale_prior = RaisedCosineDistribution('rho', {'rhoLowest': 0, 'rhoLow': 1, 'rhoHigh': 3, 'rhoHighest': 10}),
+                                            magnitude_prior = HalfNormalDistribution('alpha', {'alphaSigma': 10})))
 
-  data['S1'] = mldsdata[:,1]
+def bds(data, stimulus=None, **kwargs):
 
-  # Do we have triad or quadtruple data?
-  if mldsdata.shape[1] == 4:
-    data['S2'] = mldsdata[:,2]
-    data['S3'] = mldsdata[:,2]
-    data['S4'] = mldsdata[:,3]
-    data['Responses'] = mldsdata[:,0]
-    data['K'] = np.amax(mldsdata[:,1:4])
-  else:
-    data['S2'] = mldsdata[:,2]
-    data['S3'] = mldsdata[:,3]
-    data['S4'] = mldsdata[:,4]
-    data['Responses'] = mldsdata[:,0]
-    data['K'] = np.amax(mldsdata[:,1:5])
+#  result = default_model.sample(data, stimulus, **kwargs)
 
-  data['N'] = mldsdata.shape[0]
+  gp_dict = {'N_predict': 100,
+             'x_predict': np.concatenate([stimulus[:-1], np.linspace(stimulus[0], stimulus[-1], num=100-stimulus.shape[0]+2)[1:]]),
+             'obs_idx': np.array(range(2, stimulus.shape[0])),
+             'rho': 0.5*(stimulus[-1]-stimulus[0])}
 
-  if stimulus is None:
-    stimulus = np.linspace(0.0, 1.0, num=data['K'])
+  print(gp_dict['x_predict'])
 
-  # Set hyperparameters for prior on the decision noise
-  data['precLowest'] = precLowest
-  data['precLow'] = precLow
-  data['precHigh'] = precHigh
-  data['precHighest'] = precHighest
+  init = lambda: dict({'psi_tilde': gp_dict['x_predict'][1:-1]})
 
-  # find installed model files
-  modeldir = os.path.dirname(__file__).split('lib/python')[0] + 'share/models/'
-
-#  print(modeldir)
-
-  # Should a lapse rate be fitted?
-  if lapses:
-    data['lpsAlpha'] = lpsAlpha
-    data['lpsBeta'] = lpsBeta
-    init = lambda: {'psi': stimulus[1:-1],
-                    'precision': (precLow + precHigh)/2.0,
-                    'lapses': 0.01}
-    stanfit = fit_stan_model(modeldir, 'bds_lps', data, init)
-    result = LpsDifferenceScale(stimulus, stanfit, mldsdata)
-  else:
-    init = lambda: {'psi': stimulus[1:-1],
-                    'precision': (precLow + precHigh)/2.0}
-    stanfit = fit_stan_model(modeldir, 'bds', data, init)
-    result = DifferenceScale(stimulus, stanfit, mldsdata)
-
+  result = gp_model.sample(data, stimulus, params=gp_dict)
   return result

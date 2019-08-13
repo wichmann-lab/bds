@@ -19,13 +19,11 @@ residuals.LpsDifferenceScale <- function(scale, ppc=FALSE) {
   if (ppc) {
     resp <- as.matrix(scale$stanfit, pars = paste0('resp_hat[', 1:N, ']'))
     log_lik <- as.matrix(scale$stanfit, pars = paste0('log_lik_hat[', 1:N, ']'))
-    log_lik_sat <- as.matrix(scale$stanfit, pars = paste0('log_lik_sat_hat[', 1:N, ']'))
   } else {
     log_lik <- as.matrix(scale$stanfit, pars = paste0('log_lik[', 1:N, ']'))
-    log_lik_sat <- as.matrix(scale$stanfit, pars = paste0('log_lik_sat[', 1:N, ']'))
     resp <- matrix(rep(scale$data$Responses, each=nrow(log_lik)), ncol=N)
   }
-  residuals <- (2 * resp - 1) * sqrt(2 * (log_lik_sat - log_lik))
+  residuals <- (2 * resp - 1) * sqrt(-2 * log_lik)
 }
 
 ppc_ordered_residuals <- function(scale) {

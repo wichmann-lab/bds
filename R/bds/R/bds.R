@@ -49,6 +49,47 @@ bds <- function(mlds_data,
                 .model_obj=NULL,
                 .cores=getOption('mc.cores', default = 1L)) {
 
+  if (is.null(stimulus)) {
+    if (ncol(mlds_data) == 4) {
+      stimulus <- seq(0,1, len=max(mlds_data[,2:4]))
+    } else if (ncol(mlds_data == 5)) {
+      stimulus <- seq(0,1, len=max(mlds_data[,2:5]))
+    } else {
+      stop("Difference scaling data should have 4 or 5 columns!")
+    }
+  }
+  if (fit.lapses) {
+    md <- build_model(priors=list(psi.uniform, prec.raised_cosine, lapses.beta),
+                model=bds.model,
+                extractor_function = default_extractor)
+    init_fun <- function() {
+      list(psi = stimulus[2:(length(stimulus)-1)]/stimulus[length(stimulus)],
+           precision = md$default_params$precLow,
+           lapses = 0.01)
+    }
+  } else {
+    md <- build_model(priors=list(psi.uniform, prec.raised_cosine, lapses.const),
+                      model=bds.model,
+                      extractor_function = extractor_fixed_lapserate)
+    init_fun <- function() {
+      list(psi = stimulus[2:(length(stimulus)-1)]/stimulus[length(stimulus)],
+           precision = (md$default_params$precLow + md$default_params$precHigh)/2.0)
+    }
+  }
+
+  model_obj <- stan_model(model_code=md$model_code)
+
+  stanfit <- sample_bds_model(model_obj, mlds_data, prior_params=md$default_params, init_list = rep(list(init_fun()), times=4))
+
+  md$extractor(stanfit$stanfit, stimulus, stanfit$data)
+}
+
+sample_bds_model <- function(model_obj,
+                             mlds_data,
+                             prior_params,
+                             init_list,
+                             .cores=getOption('mc.cores', default = 1L)) {
+
   mlds_data.ordered <- order_data(mlds_data)
 
   data = list(
