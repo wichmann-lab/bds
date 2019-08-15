@@ -4,41 +4,7 @@ import numpy as np
 from .DifferenceScale import DifferenceScale
 from .stan_helpers import *
 
-def order_data(data):
-  if ('S4' not in data.columns):
-    for i, rows in data.iterrows():
-      if data.at[i,'S1'] > data.at[i, 'S3']:
-        tmp = data.at[i, 'S1']
-        data.at[i, 'S1'] = data.at[i, 'S3']
-        data.at[i, 'S3'] = tmp
-
-        data.at[i, 'Response'] = 1 - data.at[i, 'Response']
-  else:
-    for i, rows in data.iterrows():
-      if data.at[i, 'S1'] > data.at[i, 'S2']:
-        tmp = data.at[i, 'S1']
-        data.at[i, 'S1'] = data.at[i, 'S2']
-        data.at[i, 'S2'] = tmp
-
-      if data.at[i, 'S3'] > data.at[i, 'S4']:
-        tmp = data.at[i, 'S3']
-        data.at[i, 'S3'] = data.at[i, 'S4']
-        data.at[i, 'S4'] = tmp
-
-      if data.at[i,'S1'] > data.at[i, 'S3']:
-        tmp = data.at[i, 'S1']
-        data.at[i, 'S1'] = data.at[i, 'S3']
-        data.at[i, 'S3'] = tmp
-
-        tmp = data[i, 'S2']
-        data.at[i, 'S2'] = data.at[i, 'S4']
-        data.at[i, 'S4'] = tmp
-
-        data.at[i, 'Response'] = 1 - data.at[i, 'Response']
-
-  return data
-
-class BDSModel:
+class BESSModel:
   def __init__(self, model_name, likelihood, regressor, scale, priors=dict()):
     self.unregister()
 
@@ -69,11 +35,9 @@ class BDSModel:
     self._code_blocks['data'].append(
 """  int<lower=1> N;  // total number of observations 
   int<lower=1> K;  // number of stimulus levels
-  int<lower=1, upper=K> S1[N];
-  int<lower=1, upper=K> S2[N];
-  int<lower=1, upper=K> S3[N];
-  int<lower=1, upper=K> S4[N];
-  int<lower=0, upper=1> Response[N];  // response variable
+  int<lower=1, upper=K> L[N];
+  int<lower=1, upper=K> U[N];
+  int<lower=1, upper=K> Response[N];  // response variable
   real Stimulus[K];
 """)
 
@@ -105,7 +69,7 @@ class BDSModel:
 
     self.stan_model = StanModel_cache(self.model_code, model_name=self.model_name)
 
-  def sample(self, data, stimulus=None, params=dict(), **kwargs):
+  def sample(self, data, stimulus, params=dict(), **kwargs):
     if not 'init' in kwargs.keys():
       kwargs['init'] = 'random'
 
@@ -129,29 +93,13 @@ class BDSModel:
     for k, v in params.items():
       stan_data[k] = v
 
-    ordered_data = order_data(data)
-    stan_data['S1'] = ordered_data['S1']
-
-    # Do we have triad or quadtruple data?
-    if data.shape[1] == 4:
-      stan_data['S2'] = ordered_data['S2']
-      stan_data['S3'] = ordered_data['S2']
-      stan_data['S4'] = ordered_data['S3']
-      stan_data['Response'] = ordered_data['Response']
-      stan_data['K'] = max(ordered_data.max())
-    else:
-      stan_data['S2'] = ordered_data['S2']
-      stan_data['S3'] = ordered_data['S3']
-      stan_data['S4'] = ordered_data['S4']
-      stan_data['Response'] = ordered_data['Response']
-      stan_data['K'] = max(ordered_data.max())
-
+    stan_data['L'] = data['L']
+    stan_data['U'] = data['U']
+    stan_data['Response'] = data['Response']
     stan_data['N'] = data.shape[0]
+    stan_data['K'] = stimulus.shape[0]
 
-    if stimulus is None:
-      stan_data['Stimulus'] = np.linspace(0.0, 1.0, num=stan_data['K'])
-    else:
-      stan_data['Stimulus'] = stimulus
+    stan_data['Stimulus'] = stimulus
 
     fit = self.stan_model.sampling(data=stan_data,
                        iter=kwargs['iter'],
@@ -161,7 +109,7 @@ class BDSModel:
 #                       pars=kwargs['pars'],
                        init=kwargs['init'])
 
-    scale_result = DifferenceScale(fit, stan_data, ordered_data)
+    scale_result = DifferenceScale(fit, stan_data, data)
 
     self.likelihood.results(scale_result)
     self.regressor.results(scale_result)
