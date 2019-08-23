@@ -17,7 +17,8 @@ class GaussianProcess(ScaleModel):
 
     self.data_transform_def = (
 """  vector[2] fix_points = [0, 1]';
-  real xvals[N_predict+K] = append_array({Stimulus[K]}, append_array(Stimulus[1:K-1], x_predict));""")
+  real xvals[N_predict+K] = append_array({Stimulus[K]}, append_array(Stimulus[1:K-1], x_predict));
+  vector[N_predict+K-2] y_mean = (to_vector(xvals[3:])-xvals[2])/xvals[1];""")
 
     self.param_transform_gp_def = (
 """  matrix[N_predict+K, N_predict+K] cov_all = cov_exp_quad(xvals, """ + self.magnitude_prior.name + """, """ + self.length_scale_prior.name + """)
@@ -25,8 +26,6 @@ class GaussianProcess(ScaleModel):
 
   matrix[N_predict+K-2, 2] cov_ub = cov_all[3:, 1:2];
   matrix[2, 2] cov_bb = cov_all[1:2, 1:2];
-
-  vector[N_predict+K-2] y_mean = (cov_ub / cov_bb) * fix_points;
 
   matrix[N_predict+K-2, N_predict+K-2] L_cov = cholesky_decompose(cov_all[3:, 3:] - (cov_ub / cov_bb) * cov_ub');
   vector[N_predict+K-2] psi_predict = y_mean + L_cov * psi_tilde;""")
@@ -57,11 +56,11 @@ class GaussianProcess(ScaleModel):
     super().results(result_obj)
 
     result_obj.pred_scale = self.predicted_scale_values(result_obj)
-    result_obj.pred_stimulus = np.concatenate(result_obj.stan_data['Stimulus'], result_obj.stan_data['x_predict'])
+    result_obj.pred_stimulus = np.concatenate( (result_obj.stan_data['Stimulus'], result_obj.stan_data['x_predict']) )
 
   def predicted_scale_values(self, result_obj):
     scale_pars = (['psi[1]'] +
-                  ['psi_predict[%d]' % x for x in range(2,result_obj.k+1)] +
+                  ['psi_predict[%d]' % x for x in range(1,result_obj.k+1)] +
                   ['psi[%d]' % result_obj.k] +
                   ['psi_predict[%d]' % x for x in range(result_obj.k+1, result_obj.stan_data['N_predict'] + result_obj.k-1)])
     scale_vals = (result_obj.stan_fit.to_dataframe(pars=scale_pars, 

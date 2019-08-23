@@ -17,7 +17,7 @@ df = pd.read_csv('test.csv', sep=' ')
 # order of columns
 # all int? 
 
-data = df[['Response', 'i1', 'i2', 'i3']].values
+df.rename(columns={'i1': 'S1', 'i2': 'S2', 'i3': 'S3'}, inplace=True)
 
 s =df[['s1', 's2', 's3']].values
 stimulus = np.unique(s.flatten())
@@ -25,13 +25,14 @@ stimulus = np.unique(s.flatten())
 
 # how to call the functions?
 
-fit = bds.bds(data, lapses=True)
+fit = bds.bds(df, stimulus)
+#fit = bds.gp_bds(df, stimulus, np.linspace(stimulus[0], stimulus[-1], num=100))
 
 # gives warning
 # WARNING:pystan:Maximum (flat) parameter count (1000) exceeded: skipping diagnostic tests for n_eff and Rhat.
 # To run all diagnostics call pystan.check_hmc_diagnostics(fit)
 
-pystan.check_hmc_diagnostics(fit.stanfit)
+#pystan.check_hmc_diagnostics(fit.stanfit)
 
 # how to read out results? 
 scale = fit.get_scale_values()
@@ -42,22 +43,12 @@ import matplotlib.pyplot as plt
 
 # posterior predictive checks
 
-for p in fit.diagnostic_plots():
+for p in fit.diagnostic_plots.values():
   p.draw();
   plt.show()
 
 # how to plot results?
 
-plt.plot(stimulus,scale,'o')
-yerr = [CIh-scale, scale-CIl]
-plt.errorbar(stimulus, scale, yerr=yerr, fmt='none', 
-                        ecolor='b', capsize=0)
+fit.plot().draw();
 
 plt.show()
-# others:
-
-# list of requirements: pystan, numpy,..
-# be python2 compatible too? Now it only runs in python3
-
-# getting python 2 incompatibility error.
-# TypeError: super() takes at least 1 argument (0 given)

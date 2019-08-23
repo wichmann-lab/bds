@@ -34,14 +34,19 @@ def bds(data, stimulus=None, **kwargs):
 
   return result
 
-def gp_bds(data, stimulus, **kwargs):
-  gp_dict = {'N_predict': 100,
-             'x_predict': np.linspace(stimulus[0], stimulus[-1], num=100)}
+def gp_bds(data, stimulus, predictive, **kwargs):
+  gp_dict = {'N_predict': len(predictive),
+             'x_predict': predictive}
 
+#  init = lambda: {'psi_tilde': np.zeros((len(stimulus)+len(predictive)-2)),
+#                  'alpha': 0.1,
+#                  'rho': 1,
+#                  'sensitivity': 5}
+  
   result = gp_model.sample(data, stimulus, params=gp_dict, **kwargs)
   return result
 
-def gp_bess(data, **kwargs):
+def gp_bess(data, predictive, **kwargs):
   new_data = pd.DataFrame()
 
   lower = data['lower'].values
@@ -64,8 +69,13 @@ def gp_bess(data, **kwargs):
   new_data['L'] = l
   new_data['U'] = u
 
-  gp_dict = {'N_predict': 1,
-             'x_predict': np.array([0.5])}
+  gp_dict = {'N_predict': len(predictive),
+             'x_predict': predictive}
 
+#  init = lambda: {'psi_tilde': np.zeros((len(stimulus)+len(predictive)-2)),
+#                  'alpha': 0.1,
+#                  'rho': 1,
+#                  'sensitivity': 5}
+  
   result = bess_gp_model.sample(new_data, stimulus, params=gp_dict, **kwargs)
   return result

@@ -5,38 +5,43 @@ from .DifferenceScale import DifferenceScale
 from .stan_helpers import *
 
 def order_data(data):
+  df = pd.DataFrame()
+  df['Response'] = data['Response']
+  df['S1'] = data['S1']
+  df['S2'] = data['S2']
+  df['S3'] = data['S3']
+  
   if ('S4' not in data.columns):
+    df['S3'] = data['S2']
+    df['S4'] = data['S3']
+    
     for i, rows in data.iterrows():
+      
       if data.at[i,'S1'] > data.at[i, 'S3']:
-        tmp = data.at[i, 'S1']
-        data.at[i, 'S1'] = data.at[i, 'S3']
-        data.at[i, 'S3'] = tmp
+        df.at[i, 'S1'] = data.at[i, 'S3']
+        df.at[i, 'S4'] = data.at[i, 'S1']
 
-        data.at[i, 'Response'] = 1 - data.at[i, 'Response']
+        df.at[i, 'Response'] = 1 - data.at[i, 'Response']
   else:
     for i, rows in data.iterrows():
       if data.at[i, 'S1'] > data.at[i, 'S2']:
-        tmp = data.at[i, 'S1']
-        data.at[i, 'S1'] = data.at[i, 'S2']
-        data.at[i, 'S2'] = tmp
+        df.at[i, 'S1'] = data.at[i, 'S2']
+        df.at[i, 'S2'] = data.at[i, 'S1']
 
       if data.at[i, 'S3'] > data.at[i, 'S4']:
-        tmp = data.at[i, 'S3']
-        data.at[i, 'S3'] = data.at[i, 'S4']
-        data.at[i, 'S4'] = tmp
+        df.at[i, 'S3'] = data.at[i, 'S4']
+        df.at[i, 'S4'] = data.at[i, 'S3']
 
       if data.at[i,'S1'] > data.at[i, 'S3']:
-        tmp = data.at[i, 'S1']
-        data.at[i, 'S1'] = data.at[i, 'S3']
-        data.at[i, 'S3'] = tmp
+        df.at[i, 'S1'] = data.at[i, 'S3']
+        df.at[i, 'S3'] = data.at[i, 'S1']
 
-        tmp = data[i, 'S2']
-        data.at[i, 'S2'] = data.at[i, 'S4']
-        data.at[i, 'S4'] = tmp
+        df.at[i, 'S2'] = data.at[i, 'S4']
+        df.at[i, 'S4'] = data[i, 'S2']
 
-        data.at[i, 'Response'] = 1 - data.at[i, 'Response']
+        df.at[i, 'Response'] = 1 - data.at[i, 'Response']
 
-  return data
+  return df
 
 class BDSModel:
   def __init__(self, model_name, likelihood, regressor, scale, priors=dict()):
@@ -124,6 +129,9 @@ class BDSModel:
     if not 'pars' in kwargs.keys():
       pass
 
+    if not 'n_jobs' in kwargs.keys():
+      kwargs['n_jobs'] = -1
+    
     stan_data = self.hyper_params.copy()
 
     for k, v in params.items():
@@ -131,20 +139,11 @@ class BDSModel:
 
     ordered_data = order_data(data)
     stan_data['S1'] = ordered_data['S1']
-
-    # Do we have triad or quadtruple data?
-    if data.shape[1] == 4:
-      stan_data['S2'] = ordered_data['S2']
-      stan_data['S3'] = ordered_data['S2']
-      stan_data['S4'] = ordered_data['S3']
-      stan_data['Response'] = ordered_data['Response']
-      stan_data['K'] = max(ordered_data.max())
-    else:
-      stan_data['S2'] = ordered_data['S2']
-      stan_data['S3'] = ordered_data['S3']
-      stan_data['S4'] = ordered_data['S4']
-      stan_data['Response'] = ordered_data['Response']
-      stan_data['K'] = max(ordered_data.max())
+    stan_data['S2'] = ordered_data['S2']
+    stan_data['S3'] = ordered_data['S3']
+    stan_data['S4'] = ordered_data['S4']
+    stan_data['Response'] = ordered_data['Response']
+    stan_data['K'] = int(max(ordered_data.max()))
 
     stan_data['N'] = data.shape[0]
 
@@ -159,7 +158,9 @@ class BDSModel:
                        chains=kwargs['chains'],
                        control=kwargs['control'],
 #                       pars=kwargs['pars'],
-                       init=kwargs['init'])
+                       init=kwargs['init'],
+                       n_jobs=kwargs['n_jobs'],
+                       check_hmc_diagnostics=False)
 
     scale_result = DifferenceScale(fit, stan_data, ordered_data)
 

@@ -88,6 +88,9 @@ class BESSModel:
     if not 'pars' in kwargs.keys():
       pass
 
+    if not 'n_jobs' in kwargs.keys():
+      kwargs['n_jobs'] = -1
+    
     stan_data = self.hyper_params.copy()
 
     for k, v in params.items():
@@ -107,7 +110,9 @@ class BESSModel:
                        chains=kwargs['chains'],
                        control=kwargs['control'],
 #                       pars=kwargs['pars'],
-                       init=kwargs['init'])
+                       init=kwargs['init'],
+                       n_jobs=kwargs['n_jobs'],
+                       check_hmc_diagnostics=False)
 
     scale_result = DifferenceScale(fit, stan_data, data)
 

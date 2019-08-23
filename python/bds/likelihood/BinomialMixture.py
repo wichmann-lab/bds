@@ -85,11 +85,11 @@ class BinomialMixture(LikelihoodModel):
     result_obj.ppc_residual_reversals = runs
     result_obj.diagnostic_plots['residual reversals'] = plt2
 
-    pval3, flip_count, emp_rev, plt3 = self.ppc_flip_count(result_obj)
-    result_obj.pvalues['flip count'] = pval3
-    result_obj.summary_statistics['flip count'] = emp_rev
-    result_obj.ppc_flip_count = flip_count
-    result_obj.diagnostic_plots['flip count'] = plt3
+#    pval3, flip_count, emp_rev, plt3 = self.ppc_flip_count(result_obj)
+#    result_obj.pvalues['flip count'] = pval3
+#    result_obj.summary_statistics['flip count'] = emp_rev
+#    result_obj.ppc_flip_count = flip_count
+#    result_obj.diagnostic_plots['flip count'] = plt3
 
   def decision_probabilities(self, result_obj):
     dec_pars = ['decision[%d]' % x for x in range(1,result_obj.n+1)]
@@ -214,14 +214,15 @@ class BinomialMixture(LikelihoodModel):
     reversals = (result_obj.data
                  >> bind_cols(rhat_df)
                  >> gather('smp', 'rhat', cols)
-                 >> arrange(X.S1, X.S2, X.S3)
+                 >> arrange(X.S1, X.S2, X.S3, X.S4)
                  >> group_by(X.smp)
                  >> summarize_each([count_revs],X.rhat)
                  >> ungroup()
                  >> arrange(X.rhat_count_revs)
                 )
 
-    sorted_resp = result_obj.data >> arrange(X.S1, X.S2, X.S3)
+
+    sorted_resp = result_obj.data >> arrange(X.S1, X.S2, X.S3, X.S4)
 
     emp_rev = count_revs(sorted_resp['Response'])
 

@@ -28,7 +28,7 @@ class DifferenceModel(RegressorModel):
     result_obj.sensitivity = self.sensitivity(result_obj.stan_fit)
 
   def sensitivity(self, stan_fit):
-    return stan_fit.extract(pars=self.sns_prior.name)
+    return stan_fit.extract(pars=self.sns_prior.name)[self.sns_prior.name]
 
 class BESSDifferenceModel:
   def __init__(self, sensitivity_prior):
@@ -48,5 +48,5 @@ class BESSDifferenceModel:
     result_obj.sensitivity = self.sensitivity(result_obj.stan_fit)
 
   def sensitivity(self, stan_fit):
-    return stan_fit.extract(pars=self.sns_prior.name)
+    return stan_fit.extract(pars=self.sns_prior.name)[self.sns_prior.name]
 

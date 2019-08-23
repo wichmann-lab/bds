@@ -58,4 +58,4 @@ class LinearModel(RegressorModel):
     result_obj.sensitivity = self.sensitivity(result_obj.stan_fit)
 
   def sensitivity(self, stan_fit):
-    return stan_fit.extract(pars=self.sns_prior.name)
+    return stan_fit.extract(pars=self.sns_prior.name)[self.sns_prior.name]
