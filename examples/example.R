@@ -24,18 +24,18 @@ diagnostic_plots(scale)
 
 # Build and use model with different priors than the default models
 
-new.model <- build_model(priors=list(psi.uniform, prec.halfgauss, lapses.const),
+new.model <- build_model(priors=list(psi.dirichlet, sens.halfgauss, lapses.const),
                           model=bds.model,
                           extractor_function = extractor_fixed_lapserate)
 
 # Code for model with lapserate prior
-# new.model <- build_model(priors=list(psi.uniform, prec.halfgauss, lapses.beta),
+# new.model <- build_model(priors=list(psi.uniform, sens.halfgauss, lapses.beta),
 #                         model=bds.model,
 #                         extractor_function = default_extractor)
 #
 # init_fun <- function() {
 #   list(psi = stimulus[2:(length(stimulus)-1)],
-#     precision = (md$default_params$precLow + md$default_params$precHigh)/2.0,
+#     sensitivity = (md$default_params$sensLow + md$default_params$sensHigh)/2.0,
 #     lapses = 0.01)
 # }
 
@@ -45,11 +45,11 @@ new.model.obj <- stan_model(model_code = new.model$model_code)
 params <- new.model$default_params
 
 params$lapses <- 0.025
-params$precSigma <- 10
+params$sensSigma <- 10
 
 init_fun <- function() {
   list(psi = stimulus[2:(length(stimulus)-1)],
-       precision = params$precSigma/2.0)
+       sensitivity = params$sensSigma/2.0)
 }
 
 stanfit <- sample_bds_model(new.model.obj, mlds_data, prior_params=params, init_list = rep(list(init_fun()), times=4))

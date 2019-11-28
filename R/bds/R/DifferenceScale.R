@@ -10,12 +10,12 @@ default_extractor <- function(fit, stimulus, data) {
     stanfit = fit,
     stimulus = stimulus,
     scale = c(0.0, summ[paste0('psi[', 1:(data$K-2),']'),'mean'], 1.0),
-    precision = summ['precision','mean'],
+    sensitivity = summ['sensitivity','mean'],
     lapserate = lapserate,
     scale_summary = rbind(rep(0, times=ncol(summ)),
                           summ[paste0('psi[', 1:(data$K-2),']'),],
                           rep(1, times=ncol(summ))),
-    prec_summary = summ['precision',],
+    sens_summary = summ['sensitivity',],
     lps_summary = lps_summ,
     data = data
   )
@@ -32,11 +32,11 @@ extractor_fixed_lapserate <- function(fit, stimulus, data) {
     stanfit = fit,
     stimulus = stimulus,
     scale = c(0.0, summ[paste0('psi[', 1:(data$K-2),']'),'mean'], 1.0),
-    precision = summ['precision','mean'],
+    sensitivity = summ['sensitivity','mean'],
     scale_summary = rbind(rep(0, times=ncol(summ)),
                           summ[paste0('psi[', 1:(data$K-2),']'),],
                           rep(1, times=ncol(summ))),
-    prec_summary = summ['precision',],
+    sens_summary = summ['sensitivity',],
     lapserate = data$lapses,
     lps_summary = rep(NA, times=ncol(summ)),
     data = data
@@ -135,12 +135,12 @@ get_scale_credible_interval <- function(scale) {
   list(ci.low=scale$scale_summary[,'2.5%'], ci.high=scale$scale_summary[,'97.5%'])
 }
 
-get_precision <- function(scale) {
-  scale$precision
+get_sensitivity <- function(scale) {
+  scale$sensitivity
 }
 
-get_precision_credible_interval <- function(scale) {
-  list(ci.low=scale$prec_summary[["2.5%"]], ci.high=scale$prec_summary[["97.5%"]])
+get_sensitivity_credible_interval <- function(scale) {
+  list(ci.low=scale$sens_summary[["2.5%"]], ci.high=scale$sens_summary[["97.5%"]])
 }
 
 get_lapserate <- function(scale) {

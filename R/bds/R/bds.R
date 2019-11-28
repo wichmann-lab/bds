@@ -39,7 +39,8 @@ order_data <- function(mlds_data) {
 
 bds <- function(mlds_data,
                 stimulus=NULL,
-                fit.lapses=TRUE) {
+                fit.lapses=TRUE,
+                .cores=getOption('mc.cores', default = 1L)) {
 
   if (is.null(stimulus)) {
     if (ncol(mlds_data) == 4) {
@@ -51,27 +52,27 @@ bds <- function(mlds_data,
     }
   }
   if (fit.lapses) {
-    md <- build_model(priors=list(psi.uniform, prec.raised_cosine, lapses.beta),
+    md <- build_model(priors=list(psi.dirichlet, sens.raised_cosine, lapses.beta),
                 model=bds.model,
                 extractor_function = default_extractor)
     init_fun <- function() {
-      list(psi = stimulus[2:(length(stimulus)-1)],
-           precision = md$default_params$precLow,
+      list(psi_diff = diff(stimulus),
+           sensitivity = md$default_params$sensLow,
            lapses = 0.01)
     }
   } else {
-    md <- build_model(priors=list(psi.uniform, prec.raised_cosine, lapses.const),
+    md <- build_model(priors=list(psi.dirichlet, sens.raised_cosine, lapses.const),
                       model=bds.model,
                       extractor_function = extractor_fixed_lapserate)
     init_fun <- function() {
-      list(psi = stimulus[2:(length(stimulus)-1)],
-           precision = (md$default_params$precLow + md$default_params$precHigh)/2.0)
+      list(psi_diff = diff(stimulus),
+           sensitivity = (md$default_params$sensLow + md$default_params$sensHigh)/2.0)
     }
   }
 
   model_obj <- stan_model(model_code=md$model_code)
 
-  stanfit <- sample_bds_model(model_obj, mlds_data, prior_params=md$default_params, init_list = rep(list(init_fun()), times=4))
+  stanfit <- sample_bds_model(model_obj, mlds_data, prior_params=md$default_params, init_list = rep(list(init_fun()), times=4), .cores=.cores)
 
   md$extractor(stanfit$stanfit, stimulus, stanfit$data)
 }

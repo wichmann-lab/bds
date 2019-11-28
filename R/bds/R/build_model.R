@@ -187,7 +187,7 @@ bds.model <- list(
   }\n"
   )
 
-prec.raised_cosine <- list(
+sens.raised_cosine <- list(
   fn = "/**
  * Return a data matrix of specified size with rows
  * corresponding to items and the first column filled
@@ -216,49 +216,49 @@ prec.raised_cosine <- list(
     return res-norm;
   }\n",
 
-  data =  " // hyper-parameters for precision prior (uniform with cosine falloff)
-  real precLowest;
-  real<lower=precLowest> precHighest;
-  real<lower=precLowest, upper=precHighest> precLow;
-  real<lower=precLow, upper=precHighest> precHigh;\n",
+  data =  " // hyper-parameters for sensitivity prior (uniform with cosine falloff)
+  real sensLowest;
+  real<lower=sensLowest> sensHighest;
+  real<lower=sensLowest, upper=sensHighest> sensLow;
+  real<lower=sensLow, upper=sensHighest> sensHigh;\n",
   trdata = "",
-  param = "  real<lower=precLowest, upper=precHighest> precision;\n",
+  param = "  real<lower=sensLowest, upper=sensHighest> sensitivity;\n",
   trparam = "",
-  model = "  precision ~ raised_cosine(precLowest, precLow, precHigh, precHighest);\n",
-  default = list(precLowest=0, precLow=2, precHigh=15, precHighest=30)
+  model = "  sensitivity ~ raised_cosine(sensLowest, sensLow, sensHigh, sensHighest);\n",
+  default = list(sensLowest=0, sensLow=2, sensHigh=25, sensHighest=50)
   )
 
-prec.halfgauss <- list(
+sens.halfgauss <- list(
   fn = "",
-  data = " // hyper-parameters for precision prior (half-normal)
-  real<lower=0> precSigma;\n",
+  data = " // hyper-parameters for sensitivity prior (half-normal)
+  real<lower=0> sensSigma;\n",
   trdata = "",
-  param = "  real<lower=0> precision;\n",
+  param = "  real<lower=0> sensitivity;\n",
   trparam = "",
-  model = "  precision ~ normal(0, precSigma);\n",
-  default = list(precSigma=15)
+  model = "  sensitivity ~ normal(0, sensSigma);\n",
+  default = list(sensSigma=15)
 )
 
-prec.uniform <- list(
+sens.uniform <- list(
   fn = "",
-  data = " // hyper-parameters for precision prior (uniform)
-  real<lower=0> precLow;
-  real<lower=precLow> precHigh;\n",
+  data = " // hyper-parameters for sensitivity prior (uniform)
+  real<lower=0> sensLow;
+  real<lower=sensLow> sensHigh;\n",
   trdata = "",
-  param = "  real<lower=precLow, upper=precHigh> precision;\n",
+  param = "  real<lower=sensLow, upper=sensHigh> sensitivity;\n",
   trparam = "",
   model = "",
-  default = list(precLow=0, precHigh=30)
+  default = list(sensLow=0, sensHigh=30)
 )
 
-prec.const <- list(
+sens.const <- list(
   fn = "",
-  data = "  real<lower=0> precision;\n",
+  data = "  real<lower=0> sensitivity;\n",
   trdata = "",
   param = "",
   trparam = "",
   model = "",
-  default = list(precision = 10)
+  default = list(sensitivity = 10)
 )
 
 psi.uniform <- list(
@@ -275,12 +275,31 @@ psi.uniform <- list(
   }
   psi_ext[K-1] = 1;
 
-  decision = Phi(X * psi_ext * precision);\n",
+  decision = Phi(X * psi_ext * sensitivity);\n",
 
   model = "",
   default = list()
   )
 
+
+psi.dirichlet <- list(
+  fn = "",
+  data = "",
+  trdata = "",
+  param = "  simplex[K-1] psi_diff;\n",
+
+  trparam = "  vector[N] decision;
+  vector[K-1] psi;
+  psi[1] = psi_diff[1];
+  for (k in 2:K-1) {
+    psi[k] = psi[k-1] + psi_diff[k];
+  }
+
+  decision = Phi(X * psi * sensitivity);",
+
+  model = "  psi_diff ~ dirichlet(rep_vector(1.0, K-1));",
+  default = list()
+  )
 lapses.uniform <- list(
   fn = "",
   data = "",
@@ -298,7 +317,7 @@ lapses.const <- list(
   param = "",
   trparam = "",
   model = "",
-  default = list(lapses=0.0)
+  default = list(lapses=0.025)
 )
 
 lapses.beta <- list(
@@ -310,7 +329,7 @@ lapses.beta <- list(
   param = "  real<lower=0, upper=1> lapses;\n",
   trparam = "",
   model = "  lapses ~ beta(lpsAlpha, lpsBeta);\n",
-  default = list(lpsAlpha=1, lpsBeta=5)
+  default = list(lpsAlpha=1, lpsBeta=10)
 )
 
 build_model <- function(priors, model, extractor_function) {

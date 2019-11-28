@@ -14,7 +14,7 @@ rstan_options(auto_write=TRUE)
 #'@param intensities  vector of input intensities
 #'@param              trials number of simulated trials in one experiment
 #'@param simulations  number of experiments to simulate
-#'@param precision    height of response function / inverse of the standard
+#'@param sensitivity    height of response function / inverse of the standard
 #'                    deviation of the Gaussian noise
 #'@param lapserate    proportion of trials to be drawn from a Bernoulli
 #'                    distribution with p=0.5, indepent from the response function
@@ -26,7 +26,7 @@ rstan_options(auto_write=TRUE)
 simulate.responses <- function(intensities,
                                trials,
                                simulations=100,
-                               precision=10,
+                               sensitivity=10,
                                lapserate=0.0,
                                scalefun=function(x) x^(1/2),
                                sdt=FALSE) {
@@ -49,12 +49,12 @@ simulate.responses <- function(intensities,
   # Replace responses with randomly sampled coin flips according to lapse rate
   for (n in 1:simulations) {
     if (sdt) {
-      det_noise <- 1/(2*precision)
+      det_noise <- 1/(2*sensitivity)
       decision <- mapply(function(a, b, c) abs(rnorm(1, Sc[c], det_noise) - rnorm(1, Sc[b], det_noise)) -
                                               abs(rnorm(1, Sc[b], det_noise) - rnorm(1, Sc[a], det_noise)),
                          Tr[,1], Tr[,2], Tr[,3])
     } else {
-      decision <- mapply(function(a, b, c) rnorm(1, Sc[a] - 2*Sc[b] + Sc[c], 1/precision),
+      decision <- mapply(function(a, b, c) rnorm(1, Sc[a] - 2*Sc[b] + Sc[c], 1/sensitivity),
                          Tr[,1], Tr[,2], Tr[,3])
     }
 
@@ -73,7 +73,7 @@ simulate.responses <- function(intensities,
     sim.lst[['simulations']][[n]] <- data.frame(resp=responses,S1=Tr[,1], S2=Tr[,2], S3=Tr[,3])
   }
   sim.lst[["scale"]] = Sc
-  sim.lst[["prec"]] = precision
+  sim.lst[["sens"]] = sensitivity
   sim.lst[["lvl"]] = num_intens
   sim.lst[["trials"]] = trials
   # return list of simulation results
@@ -85,11 +85,11 @@ asym.bootstrap <- function(asym.fit) {
   tr <- nrow(asym.fit$data)
   sim.coef <- coef(asym.fit)
   n <- length(sim.coef)
-  prec <- sim.coef[lvl-1]
-  scale <- c(0, sim.coef[1:(lvl-2)]/prec, 1)
+  sens <- sim.coef[lvl-1]
+  scale <- c(0, sim.coef[1:(lvl-2)]/sens, 1)
 
   fn <- function(x) ifelse(x<1.0, scale[floor(x*lvl)+1], scale[lvl])
-  sim.lst <- simulate.responses(seq(0,1, len=lvl), tr, simulations=10000, precision=prec, lapserate=0.0, scalefun=fn)
+  sim.lst <- simulate.responses(seq(0,1, len=lvl), tr, simulations=10000, sensitivity=sens, lapserate=0.0, scalefun=fn)
 
   bt.fits <- lapply(sim.lst, function(sim) tryCatch(psyfun.2asym(asym.fit$formula,
                                                         data = as.data.frame(as.dm(sim)), link = probit.2asym), error=function(e) NA))
@@ -111,7 +111,7 @@ asym.bootstrap <- function(asym.fit) {
 }
 
 run.mlds <- function(simlist, lps, levels, function.name) {
-  df <- data.frame(sc=numeric(), ci.low=numeric(), ci.high=numeric(), pos=factor(), method=factor(), fn=factor(), lps=numeric(), lvl=numeric(), trials=numeric(), prec=numeric())
+  df <- data.frame(sc=numeric(), ci.low=numeric(), ci.high=numeric(), pos=factor(), method=factor(), fn=factor(), lps=numeric(), lvl=numeric(), trials=numeric(), sens=numeric())
     for(sim in simlist[['simulations']]) {
 
     time.mlds <- system.time({
@@ -130,37 +130,20 @@ run.mlds <- function(simlist, lps, levels, function.name) {
       obs.high <- apply(samples, 1, quantile, probs = 0.975)
     })
 
-    time.asym <- system.time({
-      asym <- tryCatch(psyfun.2asym(cbind(resp, 1 - resp) ~ . - 1,
-                       data = fit$obj$data, link = probit.2asym),
-                       error=function(e) NA)
-
-      if (!is.na(asym)) {
-        as.co <- c(coef(asym), asym$lambda, asym$gam)
-
-        asym.bt <- asym.bootstrap(asym)
-      } else {
-        as.co <- rep(NA, levels+1)
-        asym.bt <- list(low=rep(NA, times=levels+1), high=rep(NA, times=levels+1))
-      }
-    })
-
     utime.mlds <- time.mlds[1] + time.mlds[4]
     stime.mlds <- time.mlds[2] + time.mlds[5]
     rtime.mlds <- time.mlds[3]
 
-    utime.asym <- time.asym[1] + time.asym[4]
-    stime.asym <- time.asym[2] + time.asym[5]
-    rtime.asym <- time.asym[3]
+#   utime.asym <- time.asym[1] + time.asym[4]
+#    stime.asym <- time.asym[2] + time.asym[5]
+#    rtime.asym <- time.asym[3]
 
-    sc <- c(0, 0, 1, 1, fit$pscale[2:(levels-1)]/fit$pscale[levels], fit$pscale[levels], pval, disjoint, utime.mlds, stime.mlds, rtime.mlds,
-            as.co[1:(levels-2)]/as.co[levels-1], as.co[(levels-1):(levels+1)], utime.asym, stime.asym, rtime.asym)
-    gt <- c(0, 0, 1, 1, simlist[['scale']][2:(levels-1)], simlist[['prec']], rep(NA, times=5),
-            simlist[['scale']][2:(levels-1)], simlist[['prec']], lps/2, lps/2, rep(NA, times=3))
-    ci.low <- c(0, 0, 1, 1, obs.low, rep(NA, times=5), asym.bt$low, rep(NA, times=3))
-    ci.high <- c(0, 0, 1, 1, obs.high, rep(NA, times=5), asym.bt$high, rep(NA, times=3))
-    pos <- c(0, 0, levels-1, levels-1, 1:(levels-2), 'sigma', 'p-value', 'disjoint', 'utime', 'stime', 'rtime', 1:(levels-2), 'sigma', 'lambda', 'gamma', 'utime', 'stime', 'rtime')
-    method <- c('glm', 'asym', 'glm', 'asym', rep('glm', times=levels+4), rep('asym', times=levels+4))
+    sc <- c(0, 1, fit$pscale[2:(levels-1)]/fit$pscale[levels], fit$pscale[levels], pval, disjoint, utime.mlds, stime.mlds, rtime.mlds)
+    gt <- c(0, 1, simlist[['scale']][2:(levels-1)], simlist[['sens']], rep(NA, times=5))
+    ci.low <- c(0, 1, obs.low, rep(NA, times=5))
+    ci.high <- c(0, 1, obs.high, rep(NA, times=5))
+    pos <- c(0, levels-1, 1:(levels-2), 'sigma', 'p-value', 'disjoint', 'utime', 'stime', 'rtime')
+    method <- c(rep('glm', times=levels+6))
 
     df <- data.frame(sc=sc,
                gt=gt,
@@ -168,64 +151,44 @@ run.mlds <- function(simlist, lps, levels, function.name) {
                ci.high=ci.high,
                pos=pos,
                method=method,
-               fn=rep(function.name, times=2*levels+12),
-               lps=rep(lps, times=2*levels+12),
-               lvl=rep(simlist[['lvl']], times=2*levels+12),
-               trials=rep(simlist[['trials']], times=2*levels+12),
-               prec=rep(simlist[['prec']], times=2*levels+12))
+               fn=rep(function.name, times=levels+6),
+               lps=rep(lps, times=levels+6),
+               lvl=rep(simlist[['lvl']], times=levels+6),
+               trials=rep(simlist[['trials']], times=levels+6),
+               sens=rep(simlist[['sens']], times=levels+6))
   }
 
   df
 }
 
-#' Run simple stan model on simulated MLDS experiment
-run.stan <- function(simlist, lps, levels, function.name) {
-  df <- data.frame(sc=numeric(), ci.low=numeric(), ci.high=numeric(), pos=factor(), method=factor(), fn=factor(), lps=numeric(), lvl=numeric(), trials=numeric(), prec=numeric())
-  for (sim in simlist[['simulations']]) {
-    time.hmc <- system.time({
-      fit <- bds(sim, fit.lapses = FALSE, .model_obj = bds.obj, .cores=1)
-      disjoint <- ppc_ordered_residuals(fit)$disjoint
-      pval <- ppc_residual_run(fit)$pval
-    })
+lps.model <- build_model(priors=list(psi.dirichlet, sens.raised_cosine, lapses.beta),
+                    model=bds.model,
+                    extractor_function= default_extractor)
 
-    utime <- time.hmc[1] + time.hmc[4]
-    stime <- time.hmc[2] + time.hmc[5]
-    rtime <- time.hmc[3]
-
-    sampler_params <- get_sampler_params(fit$stanfit, inc_warmup = FALSE)
-    divergent <- mean(sapply(sampler_params, function(x) mean(x[, "divergent__"])))
-
-    sc <- c(get_scale_values(fit), get_precision(fit), pval, disjoint, utime, stime, rtime, divergent)
-    gt <- c(simlist[['scale']], simlist[['prec']], rep(NA, times=6))
-    ci.low <- c(get_scale_credible_interval(fit)$ci.low, get_precision_credible_interval(fit)$ci.low, rep(NA, times=6))
-    ci.high <- c(get_scale_credible_interval(fit)$ci.high, get_precision_credible_interval(fit)$ci.high, rep(NA, times=6))
-    pos <- c(0:(levels-1), 'sigma', 'p-value', 'disjoint', 'utime', 'stime', 'rtime', 'divergent')
-
-    df <- rbind(df, data.frame(sc=sc,
-                               gt=gt,
-                               ci.low=ci.low,
-                               ci.high=ci.high,
-                               pos=pos,
-                               method=rep('stan', times=levels+7),
-                               fn=rep(function.name, times=levels+7),
-                               lps=rep(lps, times=levels+7),
-                               lvl=rep(simlist[['lvl']], times=levels+7),
-                               trials=rep(simlist[['trials']], times=levels+7),
-                               prec=rep(simlist[['prec']], times=levels+7)))
-  }
-
-  df
-}
+lps.obj <- stan_model(model_code = lps.model$model_code)
 
 #' Run mixture model on simulated MLDS experiment
-run.stan.lapse <- function(simlist, lps, levels, function.name) {
-  df <- data.frame(sc=numeric(), ci.low=numeric(), ci.high=numeric(), pos=factor(), method=factor(), fn=factor(), lps=numeric(), lvl=numeric(), trials=numeric(), prec=numeric())
+run.stan.lapse <- function(simlist, lps, levels, function.name, stimulus) {
+  df <- data.frame(sc=numeric(), ci.low=numeric(), ci.high=numeric(), pos=factor(), method=factor(), fn=factor(), lps=numeric(), lvl=numeric(), trials=numeric(), sens=numeric())
+
+  init_fun <- function() {
+    list(psi_diff = diff(stimulus),
+         sensitivity = 4)
+  }
+  init_list <- rep(list(init_fun()), times=4)
 
   for (sim in simlist[['simulations']]) {
+  
     time.hmc <- system.time({
-      fit <- bds(sim, fit.lapses = TRUE, .model_obj = lps.obj, .cores=1)
-      disjoint <- ppc_ordered_residuals(fit)$disjoint
-      pval <- ppc_residual_run(fit)$pval
+      fitobj <- sample_bds_model(lps.obj,
+                      sim,
+                      lps.model$default_params,
+                      init_list=init_list,
+                      .cores=1)
+
+      fit <- lps.model$extractor(fitobj$stanfit, stimulus, fitobj$data)
+      disjoint <- ppc_ordered_residuals(scale)$disjoint
+      pval <- ppc_residual_run(scale)$pval
     })
 
     utime <- time.hmc[1] + time.hmc[4]
@@ -235,10 +198,10 @@ run.stan.lapse <- function(simlist, lps, levels, function.name) {
     sampler_params <- get_sampler_params(fit$stanfit, inc_warmup = FALSE)
     divergent <- mean(sapply(sampler_params, function(x) mean(x[, "divergent__"])))
 
-    sc <- c(get_scale_values(fit), get_precision(fit), get_lapserate(fit), pval, disjoint, utime, stime, rtime, divergent)
-    gt <- c(simlist[['scale']], simlist[['prec']], lps, rep(NA, times=6))
-    ci.low <- c(get_scale_credible_interval(fit)$ci.low, get_precision_credible_interval(fit)$ci.low, get_lapserate_credible_interval(fit)$ci.low, rep(NA, times=6))
-    ci.high <- c(get_scale_credible_interval(fit)$ci.high, get_precision_credible_interval(fit)$ci.high, get_lapserate_credible_interval(fit)$ci.high, rep(NA, times=6))
+    sc <- c(get_scale_values(fit), get_sensitivity(fit), get_lapserate(fit), pval, disjoint, utime, stime, rtime, divergent)
+    gt <- c(simlist[['scale']], simlist[['sens']], lps, rep(NA, times=6))
+    ci.low <- c(get_scale_credible_interval(fit)$ci.low, get_sensitivity_credible_interval(fit)$ci.low, get_lapserate_credible_interval(fit)$ci.low, rep(NA, times=6))
+    ci.high <- c(get_scale_credible_interval(fit)$ci.high, get_sensitivity_credible_interval(fit)$ci.high, get_lapserate_credible_interval(fit)$ci.high, rep(NA, times=6))
     pos <- c(0:(levels-1), 'sigma', 'lambda', 'p-value', 'disjoint', 'utime', 'stime', 'rtime', 'divergent')
 
     df <- rbind(df, data.frame(sc=sc,
@@ -251,7 +214,7 @@ run.stan.lapse <- function(simlist, lps, levels, function.name) {
                                lps=rep(lps, times=levels+8),
                                lvl=rep(simlist[['lvl']], times=levels+8),
                                trials=rep(simlist[['trials']], times=levels+8),
-                               prec=rep(simlist[['prec']], times=levels+8)))
+                               sens=rep(simlist[['sens']], times=levels+8)))
   }
 
   df
@@ -277,17 +240,17 @@ run.simulations <- function(fun, stim, fn, lvl, tr, pr, lapse, sdt=FALSE, num.si
   if (! file.exists(paste('data/bds', fn, lvl, tr, pr, lapse, 'sim.csv', sep = '-'))) {
     lapses.df <- data.frame(sc=numeric(), gt=numeric(), ci.low=numeric(), ci.high=numeric(),
                             pos=factor(), method=factor(), fn=factor(),
-                            lps=numeric(), lvl=numeric(), trials=numeric(), prec=numeric())
+                            lps=numeric(), lvl=numeric(), trials=numeric(), sens=numeric())
 
     # generate simulations for current lapserate
-    sim.lst <- simulate.responses(intensities=stim, trials=tr, simulations=num.sims, precision=pr,
+    sim.lst <- simulate.responses(intensities=stim, trials=tr, simulations=num.sims, sensitivity=pr,
                                   scalefun=fun, lapserate=lapse,
                                   sdt=sdt)
 
     num.lvl <- length(stim)
     lapses.df <- rbind(lapses.df, run.mlds(sim.lst, lapse, num.lvl, fn))
-    lapses.df <- rbind(lapses.df, run.stan(sim.lst, lapse, num.lvl, fn))
-    lapses.df <- rbind(lapses.df, run.stan.lapse(sim.lst, lapse, num.lvl, fn))
+#    lapses.df <- rbind(lapses.df, run.stan(sim.lst, lapse, num.lvl, fn))
+    lapses.df <- rbind(lapses.df, run.stan.lapse(sim.lst, lapse, num.lvl, fn, stim))
 
     write.table(lapses.df, paste('data/bds', fn, lvl, tr, pr, lapse, 'sim.csv', sep = '-'), row.names=FALSE, sep='\t')
 
@@ -303,7 +266,7 @@ simulate <- function(factor.name,
                             lapses=seq(0,0.05,len=6),
                             stimulus=list('10'=seq(0,1, len=10)),
                             num.trials=list(1000),
-                            precisions=list(10),
+                            sensitivities=list(10),
                             num.sims=144,
                             sdt=FALSE) {
 
@@ -312,7 +275,7 @@ simulate <- function(factor.name,
     sim_params <- expand.grid(fn=names(functions),
                               lvl=names(stimulus),
                               tr=num.trials,
-                              pr=precisions,
+                              pr=sensitivities,
                               lapse=lapses)
   } else {
     load(paste0('data/', factor.name, '.Rdata'))
@@ -343,6 +306,6 @@ simulate <- function(factor.name,
          sim_params$pr,
          sim_params$lapse,
          MoreArgs = list(sdt=sdt, num.sims=num.sims),
-         mc.silent = TRUE,
+#         mc.silent = TRUE,
          mc.preschedule = FALSE)
 }
