@@ -24,6 +24,7 @@ class DifferenceScale:
     self.lapserate = None
     self.scale = None
     self.sensitivity = None
+    self.deviance = None
 
   def plot(self):
     df = pd.DataFrame({'Stimulus': self.stimulus, 'Scale': np.mean(self.scale, axis=0), 'Low': np.percentile(self.scale, 2.5, axis=0), 'High': np.percentile(self.scale, 97.5, axis=0)})
@@ -68,6 +69,18 @@ class DifferenceScale:
       return np.mean(self.lapserate)
     else:
       raise ValueError('Apparently no lapse rate was fitted! lapserate is None.')
+
+  def get_lapserate_credible_interval(self):
+    if (self.lapserate):
+      return (np.percentile(self.lapserate, 2.5), np.percentile(self.lapserate, 97.5))
+    else:
+      raise ValueError('Apparently no lapse rate was fitted! lapserate is None.')
+
+  def get_deviance(self):
+    return np.mean(self.deviance)
+
+  def get_deviance_credible_interval(self):
+    return (np.percentile(self.deviance, 2.5), np.percentile(self.deviance, 97.5))
 
   def __repr__(self):
     return repr(self.get_scale_values(self))

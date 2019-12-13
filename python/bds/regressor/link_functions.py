@@ -11,3 +11,7 @@ class LinkFunction:
 class ProbitLink(LinkFunction):
   def embed(self, formula):
     return '  decision = Phi(' + formula + ');'
+
+class SensoryNoiseProbitLink(LinkFunction):
+  def embed(self, formula):
+    return '  decision = Phi( (' + formula[0] + ')/sqrt(6) ).*Phi( (' + formula[1] + ')/sqrt(2) ) + Phi( -(' + formula[0] + ')/sqrt(6) ).*Phi( -(' + formula[1] + ')/sqrt(2) );'

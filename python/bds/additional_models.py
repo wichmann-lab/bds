@@ -1,0 +1,58 @@
+bess_gp_model = BESSModel('bess',
+                         likelihood = NormalLikelihood(),
+                         regressor = BESSDifferenceModel(sensitivity_prior=RaisedCosineDistribution('sensitivity', {'sensitivityLowest': 0, 'sensitivityLow': 2.5, 'sensitivityHigh': 25, 'sensitivityHighest': 50})),
+                         scale = GaussianProcess(length_scale_prior = HalfNormalDistribution('rho', {'rhoSigma': 2}),
+                                            magnitude_prior = HalfNormalDistribution('alpha', {'alphaSigma': 2})))
+
+gp_model = BDSModel('bds_gp',
+                    likelihood = BinomialMixture(lapses_prior=BetaDistribution('lapses', {'lapsesAlpha': 1, 'lapsesBeta': 10})),
+                    regressor = DifferenceModel(link=ProbitLink(),
+                                                 sensitivity_prior=RaisedCosineDistribution('sensitivity', {'sensitivityLowest': 0, 'sensitivityLow': 2.5, 'sensitivityHigh': 25, 'sensitivityHighest': 50})),
+                    scale = GaussianProcess(length_scale_prior = HalfNormalDistribution('rho', {'rhoSigma': 2}),
+                                            magnitude_prior = HalfNormalDistribution('alpha', {'alphaSigma': 2})))
+
+def gp_bds(data, stimulus, predictive, **kwargs):
+  gp_dict = {'N_predict': len(predictive),
+             'x_predict': predictive}
+
+#  init = lambda: {'psi_tilde': np.zeros((len(stimulus)+len(predictive)-2)),
+#                  'alpha': 0.1,
+#                  'rho': 1,
+#                  'sensitivity': 5}
+  
+  result = gp_model.sample(data, stimulus, params=gp_dict, **kwargs)
+  return result
+
+def gp_bess(data, predictive, **kwargs):
+  new_data = pd.DataFrame()
+
+  lower = data['lower'].values
+  upper = data['upper'].values
+  resp = data['value'].values
+
+  stimulus = np.unique(np.concatenate([lower, resp, upper]))
+  stimulus.sort()
+
+  l = np.zeros(lower.shape, dtype=int)
+  u = np.zeros(upper.shape, dtype=int)
+  r = np.zeros(resp.shape, dtype=int)
+
+  for i in range(0, stimulus.shape[0]):
+    l[lower == stimulus[i]] = i+1
+    u[upper == stimulus[i]] = i+1
+    r[resp == stimulus[i]] = i+1
+
+  new_data['Response'] = r
+  new_data['L'] = l
+  new_data['U'] = u
+
+  gp_dict = {'N_predict': len(predictive),
+             'x_predict': predictive}
+
+#  init = lambda: {'psi_tilde': np.zeros((len(stimulus)+len(predictive)-2)),
+#                  'alpha': 0.1,
+#                  'rho': 1,
+#                  'sensitivity': 5}
+  
+  result = bess_gp_model.sample(new_data, stimulus, params=gp_dict, **kwargs)
+  return result

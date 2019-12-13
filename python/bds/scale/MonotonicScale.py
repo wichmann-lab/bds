@@ -9,7 +9,7 @@ class MonotonicScale(ScaleModel):
 """ psi[1] = 0;
   psi[2] = """ + self.diff_prior.name + """[1];
   for (k in 3:K) {
-    psi[k] = psi[k-1] + """ + self.diff_prior.name + """[k-1];
+    psi[k] = sum(""" + self.diff_prior.name + """[1:k-1]);
   }""")
 
   def register(self, bdsmodel):
