@@ -56,7 +56,7 @@ bds <- function(mlds_data,
                 model=bds.model,
                 extractor_function = default_extractor)
     init_fun <- function() {
-      list(psi_diff = diff(stimulus),
+      list(psi_diff = diff( (stimulus- min(stimulus))/max(stimulus- min(stimulus)) ),
            sensitivity = md$default_params$sensLow,
            lapses = 0.01)
     }
@@ -65,7 +65,7 @@ bds <- function(mlds_data,
                       model=bds.model,
                       extractor_function = extractor_fixed_lapserate)
     init_fun <- function() {
-      list(psi_diff = diff(stimulus),
+      list(psi_diff = diff( (stimulus- min(stimulus))/max(stimulus- min(stimulus)) ),
            sensitivity = (md$default_params$sensLow + md$default_params$sensHigh)/2.0)
     }
   }

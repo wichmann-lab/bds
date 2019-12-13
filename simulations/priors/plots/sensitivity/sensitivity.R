@@ -36,7 +36,7 @@ all.bias.df <- lapses.byfn %>%
 
 all.bias.plt <- ggplot(all.bias.df, aes(x=trials, y=bm, colour=method)) +
   geom_point() + geom_line() +
-  geom_errorbar(aes(x=trials, ymin=b_low, ymax=b_high)) +
+  geom_errorbar(aes(x=trials, ymin=b.low, ymax=b.high)) +
   scale_colour_manual(values= solpal5) +
   ylab("absolute bias") +
   xlab("#trials") +
@@ -96,4 +96,4 @@ prec.byfn.plt <- ggplot(prec.byfn.df, aes(x=trials, y=1/sdm, colour=method)) +
   ylim(0, NA) +
   NULL 
 
-save_plot("sens_prior_sim_prec_byfn.pdf", grouped.bias.plt, base_aspect_ratio = 1.5, base_height = 6)
+save_plot("sens_prior_sim_prec_byfn.pdf", prec.byfn.plt, base_aspect_ratio = 1.5, base_height = 6)

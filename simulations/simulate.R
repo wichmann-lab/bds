@@ -187,8 +187,8 @@ run.stan.lapse <- function(simlist, lps, levels, function.name, stimulus) {
                       .cores=1)
 
       fit <- lps.model$extractor(fitobj$stanfit, stimulus, fitobj$data)
-      disjoint <- ppc_ordered_residuals(scale)$disjoint
-      pval <- ppc_residual_run(scale)$pval
+      disjoint <- ppc_ordered_residuals(fit)$disjoint
+      pval <- ppc_residual_run(fit)$pval
     })
 
     utime <- time.hmc[1] + time.hmc[4]
