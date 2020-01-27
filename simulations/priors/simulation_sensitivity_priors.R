@@ -17,6 +17,8 @@ raised.cos <- build_model(priors=list(psi.uniform, prec.raised_cosine, lapses.co
                           model=bds.model,
                           extractor_function = extractor_fixed_lapserate)
 raised.cos.model <- stan_model(model_code = raised.cos$model_code)
+raised.cos.params <- list(precLowest = 0, precLow = 2.5, precHigh= 25, precHighest=50)
+raised.cos.params2 <- list(precLowest = 0, precLow = 2.5, precHigh= 30, precHighest=100)
 
 half.gauss <- build_model(priors=list(psi.uniform, prec.halfgauss, lapses.const),
                           model=bds.model,
@@ -83,7 +85,7 @@ run.stan.prec <- function(model_obj, prior_params, sim.lst, lps.lst, tr, pr, fun
 }
 
 run.prec <- function(fun, fn, tr, pr) {
-  if (! file.exists(paste('data/prec', fn, tr, pr, 'sim.csv', sep = '-'))) {
+  if (! file.exists(paste('data/prec2', fn, tr, pr, 'sim.csv', sep = '-'))) {
     lapses.df <- data.frame(sc=numeric(), gt=numeric(), ci.low=numeric(), ci.high=numeric(),
                             pos=factor(), method=factor(), fn=factor(),
                             lps=numeric(), lvl=numeric(), trials=numeric(), prec=numeric())
@@ -100,11 +102,17 @@ run.prec <- function(fun, fn, tr, pr) {
                                   sdt=FALSE)
     sim.lst[[i]] <- sl[['simulations']][[1]]
     }
-    
-    lapses.df <- rbind(lapses.df, run.stan.prec(raised.cos.model, raised.cos$default_params, sim.lst, lps.lst, tr, pr, fn, 'raised cosine'))
-    lapses.df <- rbind(lapses.df, run.stan.prec(half.gauss.model, half.gauss$default_params, sim.lst, lps.lst, tr, pr, fn, 'half-normal'))
-    lapses.df <- rbind(lapses.df, run.stan.prec(uniform.model, uniform$default_params, sim.lst, lps.lst, tr, pr, fn, 'uniform'))
-    write.table(lapses.df, paste('data/prec', fn, tr, pr, 'sim.csv', sep = '-'), row.names=FALSE, sep='\t')
+
+    lapses.df <- rbind(lapses.df, run.stan.prec(raised.cos.model, raised.cos.params, sim.lst, lps.lst, tr, pr, fn, 'raised cosine2'))
+    lapses.df <- rbind(lapses.df, run.stan.prec(raised.cos.model, raised.cos.params2, sim.lst, lps.lst, tr, pr, fn, 'raised cosine3'))
+
+    write.table(lapses.df, paste('data/prec2', fn, tr, pr, 'sim.csv', sep = '-'), row.names=FALSE, sep='\t')
+
+#    lapses.df <- rbind(lapses.df, run.stan.prec(raised.cos.model, raised.cos$default_params, sim.lst, lps.lst, tr, pr, fn, 'raised cosine'))
+#    lapses.df <- rbind(lapses.df, run.stan.prec(half.gauss.model, half.gauss$default_params, sim.lst, lps.lst, tr, pr, fn, 'half-normal'))
+#    lapses.df <- rbind(lapses.df, run.stan.prec(uniform.model, uniform$default_params, sim.lst, lps.lst, tr, pr, fn, 'uniform'))
+
+#write.table(lapses.df, paste('data/prec', fn, tr, pr, 'sim.csv', sep = '-'), row.names=FALSE, sep='\t')
 
     # run garbage collection to remove memory-intensive stan fits
     gc()
@@ -124,5 +132,6 @@ mcmapply(run.prec,
          sim_params$fn,
          sim_params$tr,
          sim_params$pr,
-         mc.silent = TRUE,
-         mc.preschedule = TRUE)
+         mc.silent = FALSE,
+         mc.preschedule = TRUE,
+         mc.cores = 24)
