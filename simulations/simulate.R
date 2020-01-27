@@ -125,7 +125,7 @@ run.mlds <- function(simlist, lps, levels, function.name) {
       disjoint <- mean(resid[1,] > sort(obs.diag$Obs.resid) | resid[2,] < sort(obs.diag$Obs.resid))
 
       n <- nrow(obs.bt$boot.samp)
-      samples <- apply(obs.bt$boot.samp, 2, function(x) c(x[1:(n-2)], x[n]))
+      samples <- apply(obs.bt$boot.samp, 2, function(x) c(x[1:(n-2)], 1/x[n]))
       obs.low <- apply(samples, 1, quantile, probs = 0.025)
       obs.high <- apply(samples, 1, quantile, probs = 0.975)
     })
@@ -145,17 +145,17 @@ run.mlds <- function(simlist, lps, levels, function.name) {
     pos <- c(0, levels-1, 1:(levels-2), 'sigma', 'p-value', 'disjoint', 'utime', 'stime', 'rtime')
     method <- c(rep('glm', times=levels+6))
 
-    df <- data.frame(sc=sc,
-               gt=gt,
-               ci.low=ci.low,
-               ci.high=ci.high,
-               pos=pos,
-               method=method,
-               fn=rep(function.name, times=levels+6),
-               lps=rep(lps, times=levels+6),
-               lvl=rep(simlist[['lvl']], times=levels+6),
-               trials=rep(simlist[['trials']], times=levels+6),
-               sens=rep(simlist[['sens']], times=levels+6))
+    df <- rbind(df, data.frame(sc=sc,
+                               gt=gt,
+                               ci.low=ci.low,
+                               ci.high=ci.high,
+                               pos=pos,
+                               method=method,
+                               fn=rep(function.name, times=levels+6),
+                               lps=rep(lps, times=levels+6),
+                               lvl=rep(simlist[['lvl']], times=levels+6),
+                               trials=rep(simlist[['trials']], times=levels+6),
+                               sens=rep(simlist[['sens']], times=levels+6)))
   }
 
   df
@@ -187,8 +187,8 @@ run.stan.lapse <- function(simlist, lps, levels, function.name, stimulus) {
                       .cores=1)
 
       fit <- lps.model$extractor(fitobj$stanfit, stimulus, fitobj$data)
-      disjoint <- ppc_ordered_residuals(scale)$disjoint
-      pval <- ppc_residual_run(scale)$pval
+      disjoint <- ppc_ordered_residuals(fit)$disjoint
+      pval <- ppc_residual_run(fit)$pval
     })
 
     utime <- time.hmc[1] + time.hmc[4]
@@ -236,8 +236,8 @@ function.zoo <- list('square'    = function(x) x^2,
                      'munsell'   = function(x) (munsell(x, 1.0)-munsell(0.0, 1.0))/(munsell(1.0, 1.0)-munsell(0.0, 1.0))
                     )
 
-run.simulations <- function(fun, stim, fn, lvl, tr, pr, lapse, sdt=FALSE, num.sims=144) {
-  if (! file.exists(paste('data/bds', fn, lvl, tr, pr, lapse, 'sim.csv', sep = '-'))) {
+run.simulations <- function(name, fun, stim, fn, lvl, tr, pr, lapse, sdt=FALSE, num.sims=144) {
+  if (! file.exists(paste(paste0('data/', name), fn, lvl, tr, pr, lapse, 'sim.csv', sep = '-'))) {
     lapses.df <- data.frame(sc=numeric(), gt=numeric(), ci.low=numeric(), ci.high=numeric(),
                             pos=factor(), method=factor(), fn=factor(),
                             lps=numeric(), lvl=numeric(), trials=numeric(), sens=numeric())
@@ -252,7 +252,7 @@ run.simulations <- function(fun, stim, fn, lvl, tr, pr, lapse, sdt=FALSE, num.si
 #    lapses.df <- rbind(lapses.df, run.stan(sim.lst, lapse, num.lvl, fn))
     lapses.df <- rbind(lapses.df, run.stan.lapse(sim.lst, lapse, num.lvl, fn, stim))
 
-    write.table(lapses.df, paste('data/bds', fn, lvl, tr, pr, lapse, 'sim.csv', sep = '-'), row.names=FALSE, sep='\t')
+    write.table(lapses.df, paste(paste0('data/', name), fn, lvl, tr, pr, lapse, 'sim.csv', sep = '-'), row.names=FALSE, sep='\t')
 
     # run garbage collection to remove memory-intensive stan fits
     gc()
@@ -271,15 +271,12 @@ simulate <- function(factor.name,
                             sdt=FALSE) {
 
 
-  if (! file.exists(paste0('data/', factor.name, '.Rdata'))) {
-    sim_params <- expand.grid(fn=names(functions),
-                              lvl=names(stimulus),
-                              tr=num.trials,
-                              pr=sensitivities,
-                              lapse=lapses)
-  } else {
-    load(paste0('data/', factor.name, '.Rdata'))
-  }
+  sim_params <- expand.grid(name=factor.name,
+                            fn=names(functions),
+                            lvl=names(stimulus),
+                            tr=num.trials,
+                            pr=sensitivities,
+                            lapse=lapses)
 
   nsims <- nrow(sim_params)
 
@@ -298,6 +295,7 @@ simulate <- function(factor.name,
   }
 
   mcmapply(run.simulations,
+         sim_params$name,
          functions[sim_params$fn],
          stimulus[sim_params$lvl],
          sim_params$fn,
@@ -306,6 +304,8 @@ simulate <- function(factor.name,
          sim_params$pr,
          sim_params$lapse,
          MoreArgs = list(sdt=sdt, num.sims=num.sims),
-#         mc.silent = TRUE,
-         mc.preschedule = FALSE)
+         mc.silent = TRUE,
+         mc.preschedule = FALSE,
+         mc.cores=24
+         )
 }
