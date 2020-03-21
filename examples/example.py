@@ -39,16 +39,30 @@ scale = fit.get_scale_values()
 
 CIl, CIh = fit.get_scale_credible_interval()
 
+from bds.plots import *
+
 import matplotlib.pyplot as plt
+
+# result plots
+
+plot_scale(fit).draw();
+plt.show()
+
+plot_posterior_samples(fit).draw();
+plt.show()
 
 # posterior predictive checks
 
-for p in fit.diagnostic_plots.values():
-  p.draw();
-  plt.show()
-
-# how to plot results?
-
-fit.plot().draw();
-
+plot_deviance(fit).draw();
 plt.show()
+
+plot_ordered_residuals(fit).draw();
+plt.show()
+
+plot_reversals(fit).draw();
+plt.show()
+
+plot_flip_count(fit).draw();
+plt.show()
+
+#import bds.additional_models

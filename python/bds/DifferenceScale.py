@@ -1,10 +1,13 @@
 import numpy as np
 import pandas as pd
 
-from dfply import *
 import pystan
 
-import plotnine as gg
+#try:
+#  import .plots
+#  plotting_enabled = True
+#except ImportError:
+#  plotting_enabled = False
 
 class DifferenceScale:
   def __init__(self, stan_fit, stan_data, data):
@@ -26,31 +29,6 @@ class DifferenceScale:
     self.sensitivity = None
     self.deviance = None
 
-  def plot(self):
-    df = pd.DataFrame({'Stimulus': self.stimulus, 'Scale': np.mean(self.scale, axis=0), 'Low': np.percentile(self.scale, 2.5, axis=0), 'High': np.percentile(self.scale, 97.5, axis=0)})
-
-    return (gg.ggplot(df, gg.aes(x='Stimulus', y='Scale', ymin='Low', ymax='High')) +
-            gg.geom_point() +
-            gg.geom_line() +
-            gg.geom_ribbon(alpha=0.3));
-
-  def plot_posterior_samples(self, samples=200):
-    pp = self.scale.T
-    pp = pp[:, np.random.choice(pp.shape[1], samples, replace=False)]
-
-    cols = ['smp[%d]' % x for x in range(0, pp.shape[1])]
-
-    scales_df = pd.DataFrame(data = pp,
-                           columns = cols)
-
-
-    df = (pd.DataFrame({'Stimulus': self.stimulus})
-          >> bind_cols(scales_df)
-          >> gather('smp', 'Scale', cols))
-
-    return (gg.ggplot(df, gg.aes(x='Stimulus', y='Scale', grouping='smp')) +
-            gg.geom_line(alpha=0.1))
-    
   def get_scale_values(self):
     return np.mean(self.scale, axis=0)
 

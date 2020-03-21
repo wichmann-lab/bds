@@ -1,8 +1,6 @@
 from .LikelihoodModel import LikelihoodModel
 from dfply import *
 
-import plotnine as gg
-
 class BinomialMixture(LikelihoodModel):
   def __init__(self, lapses_prior):
 
@@ -50,8 +48,8 @@ class BinomialMixture(LikelihoodModel):
     lapse_log_lik_hat[n] = bernoulli_lpmf(resp_hat[n] | 0.5);
     model_log_lik_hat[n] = bernoulli_lpmf(resp_hat[n] | decision[n]);
     log_lik_hat[n] = log_mix(""" + self.lps_prior.name + """,
-                             lapse_log_lik[n],
-                             model_log_lik[n]);
+                             lapse_log_lik_hat[n],
+                             model_log_lik_hat[n]);
 
     resid[n] = (2 * Response[n] - 1) * sqrt( -2 * log_lik[n]);
     resid_hat[n] = (2 * resp_hat[n] - 1) * sqrt( -2 * log_lik_hat[n]);
@@ -75,21 +73,18 @@ class BinomialMixture(LikelihoodModel):
     result_obj.decision_probabilities = self.decision_probabilities(result_obj)
     result_obj.ppc_responses = self.ppc_responses(result_obj)
 
-    pval1, ordered_residuals, plt1 = self.ppc_ordered_residuals(result_obj)
+    pval1, ordered_residuals = self.ppc_ordered_residuals(result_obj)
     result_obj.pvalues['ordered residuals'] = pval1
     result_obj.ppc_ordered_residuals = ordered_residuals
-    result_obj.diagnostic_plots['ordered residuals'] = plt1
 
-    pval2, runs, plt2 = self.ppc_residual_reversals(result_obj)
+    pval2, runs = self.ppc_residual_reversals(result_obj)
     result_obj.pvalues['residual reversals'] = pval2
     result_obj.ppc_residual_reversals = runs
-    result_obj.diagnostic_plots['residual reversals'] = plt2
 
-#    pval3, flip_count, emp_rev, plt3 = self.ppc_flip_count(result_obj)
-#    result_obj.pvalues['flip count'] = pval3
-#    result_obj.summary_statistics['flip count'] = emp_rev
-#    result_obj.ppc_flip_count = flip_count
-#    result_obj.diagnostic_plots['flip count'] = plt3
+    pval3, flip_count, emp_rev = self.ppc_flip_count(result_obj)
+    result_obj.pvalues['flip count'] = pval3
+    result_obj.summary_statistics['flip count'] = emp_rev
+    result_obj.ppc_flip_count = flip_count
 
   def decision_probabilities(self, result_obj):
     dec_pars = ['decision[%d]' % x for x in range(1,result_obj.n+1)]
@@ -163,12 +158,7 @@ class BinomialMixture(LikelihoodModel):
 
     print('Proportion of non-overlapping intervals:', pval[0])
 
-    ppc_plot = (gg.ggplot(ppc_summary, gg.aes(x='residuals_median', y='sortid', color='origin')) +
-       gg.geom_line() +
-       gg.geom_line(gg.aes(x='residuals_p250')) + 
-       gg.geom_line(gg.aes(x='residuals_p975')))
-
-    return (pval[0], ppc_summary, ppc_plot)
+    return (pval[0], ppc_summary)
 
   def ppc_residual_reversals(self, result_obj):
     pp = result_obj.ppc_responses.T
@@ -196,41 +186,22 @@ class BinomialMixture(LikelihoodModel):
 
     print('Proportion of runs larger in empirical data:', pval)
 
-    ppc_plot = (gg.ggplot(run_df, gg.aes(x='runs', fill='origin')) +
-       gg.geom_histogram(binwidth=2.0))
-
-    return (pval, run_df, ppc_plot)
+    return (pval, run_df)
 
   def ppc_flip_count(self, result_obj):
     pp = result_obj.ppc_responses.T
-    cols = ['smp[%d]' % x for x in range(0, pp.shape[1])]
 
     def count_revs(a):
-      return np.sum(np.abs(np.diff(a)))
+      return np.sum(np.abs(np.diff(a, axis=0)), axis=0)
 
-    rhat_df = pd.DataFrame(data = pp,
-                           columns = cols)
+    flips = count_revs(pp)
+    flip_df = pd.DataFrame({'runs': flips, 'origin': 'simulated'})
 
-    reversals = (result_obj.data
-                 >> bind_cols(rhat_df)
-                 >> gather('smp', 'rhat', cols)
-                 >> arrange(X.S1, X.S2, X.S3, X.S4)
-                 >> group_by(X.smp)
-                 >> summarize_each([count_revs],X.rhat)
-                 >> ungroup()
-                 >> arrange(X.rhat_count_revs)
-                )
+    emp_rev = count_revs(result_obj.data['Response'].T)
 
-
-    sorted_resp = result_obj.data >> arrange(X.S1, X.S2, X.S3, X.S4)
-
-    emp_rev = count_revs(sorted_resp['Response'])
-
-    pval = np.searchsorted(reversals['rhat_count_revs'], emp_rev)/reversals.shape[0]
+    pval = np.searchsorted(flips, emp_rev)/flips.shape[0]
 
     print('Number of reversals:', emp_rev, '-- p-value:', pval)
 
-    ppc_plot = (gg.ggplot(reversals, gg.aes(x='rhat_count_revs')) +
-       gg.geom_histogram(binwidth=2.0) + gg.geom_vline(gg.aes(xintercept=emp_rev)))
-    return (pval, reversals, emp_rev, ppc_plot)
+    return (pval, flip_df, emp_rev)
 

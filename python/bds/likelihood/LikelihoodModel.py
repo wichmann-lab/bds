@@ -34,7 +34,7 @@ class LikelihoodModel:
     return residuals
 
   def deviance(self, stan_fit):
-    return stan_fit.extract(pars='deviance')
+    return stan_fit.extract(pars='deviance')['deviance']
 
   def ppc_deviance(self, stan_fit):
-    return stan_fit.extract(pars='deviance_hat')
+    return stan_fit.extract(pars='deviance_hat')['deviance_hat']
