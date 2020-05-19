@@ -1,3 +1,11 @@
+from .DifferenceScale import *
+from .BDSModel import BDSModel
+from .BESSModel import BESSModel
+from .likelihood import *
+from .regressor import *
+from .prior import *
+from .scale import *
+
 bess_gp_model = BESSModel('bess',
                          likelihood = NormalLikelihood(),
                          regressor = BESSDifferenceModel(sensitivity_prior=RaisedCosineDistribution('sensitivity', {'sensitivityLowest': 0, 'sensitivityLow': 2.5, 'sensitivityHigh': 25, 'sensitivityHighest': 50})),
@@ -11,7 +19,25 @@ gp_model = BDSModel('bds_gp',
                     scale = GaussianProcess(length_scale_prior = HalfNormalDistribution('rho', {'rhoSigma': 2}),
                                             magnitude_prior = HalfNormalDistribution('alpha', {'alphaSigma': 2})))
 
-def gp_bds(data, stimulus, predictive, **kwargs):
+bds_model_constant_lapses = BDSModel('bds_constant_lapses',
+                         likelihood = BinomialMixture(lapses_prior=Constant('lapses', 'real<lower=0, upper=1>')),
+                         regressor = LinearModel(link=ProbitLink(),
+                                                 sensitivity_prior=RaisedCosineDistribution('sensitivity', {'sensitivityLowest': 0, 'sensitivityLow': 2.5, 'sensitivityHigh': 25, 'sensitivityHighest': 50})),
+                         scale = MonotonicScale(diff_prior=DirichletDistribution('psi_diff', 'K-1', {'psi_diffAlpha': 1})))
+
+sensory_noise_model = BDSModel('bds_sensory_noise',
+                         likelihood = BinomialMixture(lapses_prior=BetaDistribution('lapses', {'lapsesAlpha': 1, 'lapsesBeta': 10})),
+                         regressor = SensoryNoiseModel(link=SensoryNoiseProbitLink(),
+                                                 sensitivity_prior=RaisedCosineDistribution('sensitivity', {'sensitivityLowest': 0, 'sensitivityLow': 2.5, 'sensitivityHigh': 25, 'sensitivityHighest': 50})),
+                         scale = MonotonicScale(diff_prior=DirichletDistribution('psi_diff', 'K-1', {'psi_diffAlpha': 1})))
+
+abs_model = BDSModel('bds_sensory_noise',
+                         likelihood = BinomialMixture(lapses_prior=BetaDistribution('lapses', {'lapsesAlpha': 1, 'lapsesBeta': 10})),
+                         regressor = DifferenceModel(link=ProbitLink(),
+                                                 sensitivity_prior=RaisedCosineDistribution('sensitivity', {'sensitivityLowest': 0, 'sensitivityLow': 2.5, 'sensitivityHigh': 25, 'sensitivityHighest': 50})),
+                         scale = MonotonicScale(diff_prior=DirichletDistribution('psi_diff', 'K-1', {'psi_diffAlpha': 1})))
+
+def bds_gp(data, stimulus, predictive, **kwargs):
   gp_dict = {'N_predict': len(predictive),
              'x_predict': predictive}
 
@@ -23,7 +49,7 @@ def gp_bds(data, stimulus, predictive, **kwargs):
   result = gp_model.sample(data, stimulus, params=gp_dict, **kwargs)
   return result
 
-def gp_bess(data, predictive, **kwargs):
+def bess(data, predictive, **kwargs):
   new_data = pd.DataFrame()
 
   lower = data['lower'].values
@@ -55,4 +81,22 @@ def gp_bess(data, predictive, **kwargs):
 #                  'sensitivity': 5}
   
   result = bess_gp_model.sample(new_data, stimulus, params=gp_dict, **kwargs)
+  return result
+
+def bds_constant_lapserate(data, stimulus=None, lapserate=0.0, **kwargs):
+
+  result = bds_model_constant_lapses.sample(data, stimulus, params={'lapses': lapserate}, **kwargs)
+
+  return result
+
+def bds_sensory_noise(data, stimulus=None, **kwargs):
+
+  result = sensory_noise_model.sample(data, stimulus, **kwargs)
+
+  return result
+
+def bds_abs(data, stimulus=None, **kwargs):
+
+  result = abs_model.sample(data, stimulus, **kwargs)
+
   return result

@@ -97,7 +97,12 @@ class BinomialMixture(LikelihoodModel):
     return probs
 
   def lapses(self, stan_fit):
-    return stan_fit.extract(pars=self.lps_prior.name)
+    try:
+      lps = stan_fit.extract(pars=self.lps_prior.name)
+      return lps[self.lps_prior.name]
+    except ValueError:
+      return None
+    
 
   def classify_lapses(self, stan_fit):
     pass

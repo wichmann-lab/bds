@@ -60,9 +60,9 @@ class GaussianProcess(ScaleModel):
 
   def predicted_scale_values(self, result_obj):
     scale_pars = (['psi[1]'] +
-                  ['psi_predict[%d]' % x for x in range(1,result_obj.k+1)] +
+                  ['psi_predict[%d]' % x for x in range(1,result_obj.k-1)] +
                   ['psi[%d]' % result_obj.k] +
-                  ['psi_predict[%d]' % x for x in range(result_obj.k+1, result_obj.stan_data['N_predict'] + result_obj.k-1)])
+                  ['psi_predict[%d]' % x for x in range(result_obj.k-1, result_obj.stan_data['N_predict'] + result_obj.k-1)])
     scale_vals = (result_obj.stan_fit.to_dataframe(pars=scale_pars, 
                                   inc_warmup=False,
                                   diagnostics=False)

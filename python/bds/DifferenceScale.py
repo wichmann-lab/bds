@@ -15,6 +15,7 @@ class DifferenceScale:
     self.stimulus = stan_data['Stimulus']
     self.n = stan_data['N']
     self.k = stan_data['K']
+    self.responses = stan_data['Response']
 
     self.stan_data = stan_data
 
@@ -43,7 +44,7 @@ class DifferenceScale:
     return (np.percentile(self.sensitivity, 2.5), np.percentile(self.sensitivity, 97.5))
 
   def get_lapserate(self):
-    if (self.lapserate):
+    if (self.lapserate is not None):
       return np.mean(self.lapserate)
     else:
       raise ValueError('Apparently no lapse rate was fitted! lapserate is None.')
