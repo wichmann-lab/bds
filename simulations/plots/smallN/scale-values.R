@@ -11,7 +11,7 @@ bds.byfn <- smallN.df %>%
   mutate(cvc = coverage(gt, ci.low, ci.high)) %>%
   group_by(method, fn, pos, lps, gt, trials) %>%
   summarize(sd=sd(sc, na.rm = TRUE), m=mean(sc, na.rm = TRUE), cv=mean(cvc)) %>%
-  mutate(bias = m - gt)
+  mutate(bias = abs(m - gt))
 
 bds.bias.df <- bds.byfn %>%
   group_by(lps, method, trials) %>%
@@ -31,9 +31,10 @@ bds.bias.plt <- ggplot(bds.bias.df, aes(x=lps, y=bm, colour=method, shape=method
   scale_colour_manual(values = solpal5, labels=c("MLDS", "BDS")) +
   scale_shape_manual(values = c(15, 17), labels=c("MLDS", "BDS")) +
   scale_x_continuous(breaks = c(0, 0.1, 0.2), labels = c("0", "0.1", "0.2")) +
-  ylab("average bias") +
+#  ylim(c(0, 0.4)) +
+  ylab("mean absolute deviation") +
   xlab("lapse rate") +
-  theme(legend.position = "right",
+  theme(legend.position = "none",
         strip.text = element_text(size=8),
         axis.text = element_text(size=6),
         legend.title = element_text(size=8),
@@ -44,7 +45,7 @@ bds.bias.plt <- ggplot(bds.bias.df, aes(x=lps, y=bm, colour=method, shape=method
         legend.box.margin = margin(-10,0,0,0)) +
   NULL
 
-save_plot("smallN_scale_bias.pdf", bds.bias.plt, base_width = 3, base_height = 2)
+save_plot("smallN_scale_bias.pdf", bds.bias.plt, base_width = 3, base_height = 3)
 
 ###
 
@@ -61,8 +62,8 @@ prec.plt <- ggplot(prec.df, aes(x=lps, y=prm, colour=method, shape=method)) +
   xlab("lapse rate") +
   ylab("average precision") +
   ylim(0, NA) +
-  theme(legend.position = c(0.55, 0.0),
-        legend.justification = c(0.0, 0.0),
+  theme(legend.position = "right",#c(0.55, 0.0),
+#        legend.justification = c(0.0, 0.0),
         axis.text = element_text(size=6),
         legend.title = element_text(size=8),
         strip.text = element_text(size=8),
@@ -76,6 +77,9 @@ prec.plt <- ggplot(prec.df, aes(x=lps, y=prm, colour=method, shape=method)) +
 
 save_plot("smallN_scale_precision.pdf", prec.plt, base_width = 3.2, base_height = 2)
 
+combined.plt <- plot_grid(plotlist=list(bds.bias.plt, prec.plt), ncol=1)
+save_plot("smallN_scale_values_combined.pdf", combined.plt, base_width = 3, base_height = 4)
+
 ###
 
 bds.coverage.plt <- ggplot(bds.bias.df, aes(x=lps, y=cvm, colour=method, shape=method)) +
@@ -85,22 +89,23 @@ bds.coverage.plt <- ggplot(bds.bias.df, aes(x=lps, y=cvm, colour=method, shape=m
   scale_colour_manual(values = solpal5, labels=c("MLDS", "BDS")) +
   scale_shape_manual(values = c(15, 17), labels=c("MLDS", "BDS")) +
   scale_x_continuous(breaks = c(0, 0.1, 0.2), labels = c("0", "0.1", "0.2")) +
-  ylab("coverage") +
+  ylab("coverage - scale values") +
   xlab("lapse rate") +
   ylim(0, 1) +
-  theme(legend.position = c(1, 0.0),
-        legend.justification = c(1.0, 0.0),
+  theme(legend.position = c(1, -0.15),
+        legend.justification = c(1, 0.0),
         strip.text = element_text(size=8),
         axis.text = element_text(size=6),
-        legend.title = element_text(size=8),
+        legend.title = element_blank(),#element_text(size=8),
         legend.text = element_text(size=7),
         axis.title = element_text(size=8),
-        plot.margin = unit(c(0,0,0,0), "pt"),
-        legend.margin = margin(0,0,0,0),
+        axis.title.x = element_blank(),
+        plot.margin = unit(c(0,0,3,0), "pt"),
+        legend.margin = margin(0,0,10,0),
         legend.box.margin = margin(-10,0,0,0)) +
   NULL
 
-save_plot("bds_scale_coverage.pdf", bds.coverage.plt, base_width = 3.2, base_height = 2)
+save_plot("smallN_scale_coverage.pdf", bds.coverage.plt, base_width = 3.2, base_height = 2)
 
 ###
 

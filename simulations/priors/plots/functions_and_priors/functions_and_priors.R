@@ -199,3 +199,76 @@ sc.err.plt <- ggplot(dat, aes(x=xval,y=yval,ymin=ymin,ymax=ymax,colour=mt)) +
 sc.err.plt
 
 save_plot("scale_value_error_metrics.svg", sc.err.plt, base_width = 1.5, base_height = 1.5)
+
+## 
+
+points = data.frame(response = c(1, 0, 0, 1, 1, 0, 1, 1),
+                    delta = c(-2.0, -1.3, -0.6, -0.3, 0.5, 0.9, 1.6, 2.0))
+
+points$probs <- pnorm(points$delta)
+points$resid <- sign(points$response-points$probs) * sqrt(-2*log(points$probs*points$response + (1-points$probs)*(1-points$response)))
+  
+residuals.plt <- ggplot(points, aes(x=delta, y=response)) +
+  geom_segment(aes(xend=delta, yend=probs, colour=resid), size=1) +
+  geom_point(size=2.5, shape=15) +
+  stat_function(fun=pnorm, colour="#D40000") +
+  scale_colour_viridis_c(option="D", limits=c(-3, 3)) +
+  scale_y_continuous(breaks = c(0,1), labels = c('0', '1')) +
+  xlim(-2.5, 2.5) +
+  geom_point(aes(y=probs), colour="#D40000") +
+  theme(legend.position='none',
+#        axis.text = element_text(size=6),
+        axis.title.y = element_blank(),
+#        axis.title.x = element_text(size=8),
+        plot.margin = unit(c(0,0,0,0), "pt"))
+
+save_plot("example_residuals.svg", residuals.plt, base_width = 3.5, base_height = 2.5)
+
+sorted_resid.plt <- ggplot(points, aes(y=rank(resid), x=resid, yend=rank(resid), xend=0, colour=resid)) +
+  geom_line(colour='grey', linetype='dashed', size=1) +
+  geom_segment(size=1) +
+  xlab("deviance residuals") +
+  ylab("sort index") +
+  geom_point() +
+  scale_colour_viridis_c(option="D", limits=c(-3, 3)) +
+  theme(legend.position='none',
+#        axis.text = element_text(size=6),
+#        axis.title.y = element_blank(),
+#        axis.title.x = element_text(size=8),
+        plot.margin = unit(c(0,0,0,0), "pt"))
+
+save_plot("sorted_resid.svg", sorted_resid.plt, base_width = 2.5, base_height = 2.5)
+
+reversals.plt <- ggplot(points, aes(x=delta, y=response)) +
+  geom_point(size=2.5, shape=15) +
+  scale_y_continuous(breaks = c(0,1), labels = c('0', '1')) +
+  xlim(-2.5, 2.5) +
+  theme(legend.position='none',
+#        axis.text = element_text(size=6),
+        axis.title.y = element_blank(),
+#        axis.title.x = element_text(size=8),
+        plot.margin = unit(c(0,0,0,0), "pt"))
+
+save_plot("reversals.svg", reversals.plt, base_width = 2.5, base_height = 1.5)
+
+load("~/Projects/data_mlds_processed/raw/aguilar_2019/SRsub3.Rdata")
+
+resid.df <- data.frame(resid = sort(glm.fit.gof$Obs.resid),
+                       low = apply(glm.fit.gof$resid, 2, quantile, probs=0.025),
+                       high = apply(glm.fit.gof$resid, 2, quantile, probs=0.975),
+                       y=seq(0,1, length=length(glm.fit.gof$Obs.resid)))
+
+resid_dist.plt <- ggplot(resid.df, aes(y=y, x=resid)) +
+  geom_line(aes(x=low-0.1)) +
+  geom_line(aes(x=high+0.1)) +
+  geom_line(colour="#d33682", size=1) +
+  xlab("deviance residuals") +
+  scale_colour_viridis_c(option="D", limits=c(-3,3)) +
+  theme(legend.position='none',
+        axis.title.y = element_blank(),
+        axis.line.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.text.y = element_blank(),
+        plot.margin = unit(c(0,0,0,0), "pt"))
+
+save_plot("residual_distribution.svg", resid_dist.plt, base_width = 2.5, base_height = 2.5)
