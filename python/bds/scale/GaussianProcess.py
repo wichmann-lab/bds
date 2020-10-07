@@ -17,8 +17,8 @@ class GaussianProcess(ScaleModel):
 
     self.data_transform_def = (
 """  vector[2] fix_points = [0, 1]';
-  real xvals[N_predict+K] = append_array({Stimulus[K]}, append_array(Stimulus[1:K-1], x_predict));
-  vector[N_predict+K-2] y_mean = (to_vector(xvals[3:])-xvals[2])/xvals[1];""")
+  real xvals[N_predict+K] = to_array_1d((to_vector(append_array({Stimulus[K]}, append_array(Stimulus[1:K-1], x_predict)))-Stimulus[1])/Stimulus[K]);
+  vector[N_predict+K-2] y_mean = to_vector(xvals[3:]);""")
 
     self.param_transform_gp_def = (
 """  matrix[N_predict+K, N_predict+K] cov_all = cov_exp_quad(xvals, """ + self.magnitude_prior.name + """, """ + self.length_scale_prior.name + """)
