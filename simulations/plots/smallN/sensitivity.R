@@ -6,16 +6,16 @@ coverage <- function(gt,l,h) {
   ifelse (gt >= l & gt <= h, 1, 0)
 }
 
-sensitivity.df <- data.df %>% filter(pos == "sigma") %>%
+sensitivity.df <- smallN.df %>% filter(pos == "sigma") %>%
   mutate(cvc = coverage(gt, ci.low, ci.high)) %>%
-  group_by(method, trials, lps) %>% summarize(pb = mean(sc/gt),
+  group_by(method, trials, lps) %>% summarize(pb = median(sc/gt),
            low = quantile(sc/gt, probs=0.025)[[1]],
            high = quantile(sc/gt, probs=0.975)[[1]],
            prec = 1/sd(sc/gt),
            nprec = 1/(sd(sc)/mean(sc)),
            cv = mean(cvc))
 
-sensitivity.byfn.df <- data.df %>% filter(pos == "sigma" & trials == 330) %>% group_by(method, lps, fn, sens) %>% summarize(pb = mean(sc)/mean(gt) - 1,
+sensitivity.byfn.df <- smallN.df %>% filter(pos == "sigma") %>% group_by(method, lps, fn, sens) %>% summarize(pb = mean(sc)/mean(gt) - 1,
                                                                                               low = quantile(sc, probs=0.025)[[1]]/mean(gt) - 1,
                                                                                               high = quantile(sc, probs=0.975)[[1]]/mean(gt) - 1)
 
@@ -31,6 +31,7 @@ bds.sens.plt <- ggplot(sensitivity.df, aes(x=lps, y=pb, colour=method, shape=met
   geom_point() +
   xlab("lapse rate") +
   ylab("normalised sensitivity estimate") +
+  ylim(c(0, 4)) +
   scale_x_continuous(breaks = c(0, 0.1, 0.2), labels = c("0", "0.1", "0.2")) +
   theme(legend.position = "none",#c(1.0, 0.95),
 #        legend.justification = c(1, 1),
@@ -44,7 +45,7 @@ bds.sens.plt <- ggplot(sensitivity.df, aes(x=lps, y=pb, colour=method, shape=met
         legend.margin = margin(0,0,0,0)) +
   NULL
 
-save_plot("bds_sim_sensitivity_bias.pdf", bds.sens.plt, base_width = 3, base_height=2)
+save_plot("smallN_sensitivity_bias.pdf", bds.sens.plt, base_width = 3, base_height=2)
 
 ###
 
@@ -58,7 +59,7 @@ bds.sens.prec.plt <- ggplot(sensitivity.df, aes(x=lps, y=prec, colour=method, sh
   scale_shape_manual(values = c(15, 17), labels=c("MLDS", "BDS")) +
   scale_x_continuous(breaks = c(0, 0.1, 0.2), labels = c("0", "0.1", "0.2")) +
   ylim(0, NA) +
-  theme(legend.position = c(1,0), legend.justification = c(1,0),
+  theme(legend.position = c(1,1.1), legend.justification = c(1,1),
         axis.text = element_text(size=6),
         legend.title = element_blank(),#element_text(size=8),
         strip.text = element_blank(), #element_text(size=8),
@@ -69,10 +70,10 @@ bds.sens.prec.plt <- ggplot(sensitivity.df, aes(x=lps, y=prec, colour=method, sh
         legend.margin = margin(0,0,0,0)) +
   NULL
 
-save_plot("bds_sim_sensitivity_precision.pdf", bds.sens.prec.plt, base_width = 3, base_height=2)
+save_plot("smallN_sensitivity_precision.pdf", bds.sens.prec.plt, base_width = 3, base_height=2)
 
 combined.plt <- plot_grid(plotlist=list(bds.sens.plt, bds.sens.prec.plt), ncol=1)
-save_plot("bds_sensitivity_combined.pdf", combined.plt, base_width = 3, base_height = 3.2)
+save_plot("smallN_sensitivity_combined.pdf", combined.plt, base_width = 3, base_height = 3.2)
 ###
 ###
 
@@ -90,17 +91,17 @@ bds.sens.coverage.plt <- ggplot(sensitivity.df, aes(x=lps, y=cv, colour=method, 
   theme(legend.position = "none",#c(1,.95), legend.justification = c(1,1),
         axis.text = element_text(size=6),
         legend.title = element_blank(),#element_text(size=8),
-        strip.text = element_blank(), #element_text(size=8),
-        strip.background = element_blank(),
+        strip.text =element_text(size=8),
+#        strip.background = element_blank(),
         legend.text = element_text(size=7),
         axis.title = element_text(size=8),
         plot.margin = unit(c(0,0,0,0), "pt"),
         legend.margin = margin(0,0,0,0)) +
   NULL
 
-save_plot("bds_sim_sensitivity_coverage.pdf", bds.sens.coverage.plt, base_width = 3, base_height=2)
+save_plot("smallN_sensitivity_coverage.pdf", bds.sens.coverage.plt, base_width = 3, base_height=2)
 coverage.combined.plt <- plot_grid(plotlist=list(bds.coverage.plt, bds.sens.coverage.plt), ncol=1)
-save_plot("bds_coverage_combined.pdf", coverage.combined.plt, base_width = 3, base_height = 3)
+save_plot("smallN_coverage_combined.pdf", coverage.combined.plt, base_width = 3, base_height = 3)
 ###
 
 ggplot(sensitivity.byfn.df, aes(x=sens, y=pb, colour=method)) +
