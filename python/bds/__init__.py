@@ -14,6 +14,14 @@ default_model = BDSModel('bds',
 
 def bds(data, stimulus=None, **kwargs):
 
+  if not 'init' in kwargs.keys():
+    k = int(max(data.max()))
+    init = lambda: {'psi_tilde': np.ones(k - 1) / k,
+                    'lapses': 0.01,
+                    'sensitivity': default_model.hyper_params['sensitivityLow']}
+    
+    kwargs['init'] = init
+
   result = default_model.sample(data, stimulus, **kwargs)
 
   return result

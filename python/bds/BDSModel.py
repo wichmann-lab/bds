@@ -111,9 +111,6 @@ class BDSModel:
     self.stan_model = StanModel_cache(self.model_code, model_name=self.model_name)
 
   def sample(self, data, stimulus=None, params=dict(), **kwargs):
-    if not 'init' in kwargs.keys():
-      kwargs['init'] = 'random'
-
     if not 'control' in kwargs.keys():
       kwargs['control'] = {'adapt_delta': 0.99}
 

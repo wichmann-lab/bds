@@ -41,12 +41,13 @@ def bds_gp(data, stimulus, predictive, **kwargs):
   gp_dict = {'N_predict': len(predictive),
              'x_predict': predictive}
 
-#  init = lambda: {'psi_tilde': np.zeros((len(stimulus)+len(predictive)-2)),
-#                  'alpha': 0.1,
-#                  'rho': 1,
-#                  'sensitivity': 5}
+  init = lambda: {'psi_tilde': np.zeros(len(stimulus)+len(predictive)-2),
+                  'lapses': 0.01,
+                  'alpha': 0.5,
+                  'rho': 0.5,
+                  'sensitivity': gp_model.hyper_params['sensitivityLow']}
   
-  result = gp_model.sample(data, stimulus, params=gp_dict, **kwargs)
+  result = gp_model.sample(data, stimulus, params=gp_dict, init=init, **kwargs)
   return result
 
 def bess(data, predictive, **kwargs):
@@ -85,12 +86,29 @@ def bess(data, predictive, **kwargs):
 
 def bds_constant_lapserate(data, stimulus=None, lapserate=0.0, **kwargs):
 
+  if not 'init' in kwargs.keys():
+    k = int(max(data.loc[:, ('S1', 'S2', 'S3')].max()))
+
+    init = lambda: {'psi_tilde': np.ones(k - 1) / k,
+                    'sensitivity': bds_model_constant_lapses.hyper_params['sensitivityLow']}
+                                                      
+    kwargs['init'] = init
+                                                      
   result = bds_model_constant_lapses.sample(data, stimulus, params={'lapses': lapserate}, **kwargs)
 
   return result
 
 def bds_sensory_noise(data, stimulus=None, **kwargs):
 
+  if not 'init' in kwargs.keys():
+    k = int(max(data.loc[:, ('S1', 'S2', 'S3')].max()))
+
+    init = lambda: {'psi_tilde': np.ones(k - 1) / k,
+                    'lapses': 0.01,
+                    'sensitivity': sensory_noise_model.hyper_params['sensitivityLow']}
+                                                      
+    kwargs['init'] = init
+                                                      
   result = sensory_noise_model.sample(data, stimulus, **kwargs)
 
   return result
@@ -99,9 +117,13 @@ def bds_abs(data, stimulus=None, **kwargs):
 
   if not 'init' in kwargs.keys():
     k = int(max(data.loc[:, ('S1', 'S2', 'S3')].max()))
-    init_list = {'psi_hat': np.linspace(0, 1, num=k)[1:-1], 'sensitivity': 5, 'lapses': 0.1}
-    kwargs['init'] = lambda chain_id: init_list
-
+            
+    init = lambda: {'psi_hat': np.linspace(0, 1, num=k)[1:-1],
+                    'lapses': 0.01,
+                    'sensitivity': abs_model.hyper_params['sensitivityLow']}
+                                                      
+    kwargs['init'] = init
+                                                      
   result = abs_model.sample(data, stimulus, **kwargs)
 
   return result
