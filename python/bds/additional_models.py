@@ -87,7 +87,7 @@ def bess(data, predictive, **kwargs):
 def bds_constant_lapserate(data, stimulus=None, lapserate=0.0, **kwargs):
 
   if not 'init' in kwargs.keys():
-    k = int(max(data.max()))
+    k = int(max(data[['S1','S2', 'S3']].max()))
 
     init = lambda: {'psi_tilde': np.ones(k - 1) / k,
                     'sensitivity': bds_model_constant_lapses.hyper_params['sensitivityLow']}
@@ -101,7 +101,7 @@ def bds_constant_lapserate(data, stimulus=None, lapserate=0.0, **kwargs):
 def bds_sensory_noise(data, stimulus=None, **kwargs):
 
   if not 'init' in kwargs.keys():
-    k = int(max(data.max()))
+    k = int(max(data[['S1','S2', 'S3']].max()))
 
     init = lambda: {'psi_tilde': np.ones(k - 1) / k,
                     'lapses': 0.01,
@@ -116,7 +116,7 @@ def bds_sensory_noise(data, stimulus=None, **kwargs):
 def bds_abs(data, stimulus=None, **kwargs):
 
   if not 'init' in kwargs.keys():
-    k = int(max(data.max()))
+    k = int(max(data[['S1','S2', 'S3']].max()))
             
     init = lambda: {'psi_tilde': np.ones(k - 1) / k,
                     'lapses': 0.01,
