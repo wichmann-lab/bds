@@ -15,3 +15,23 @@ class Prior:
 
     for (k,v) in self.defaults.items():
       bdsmodel.hyper_params[k] = v
+
+class UnconstrainedVector(Prior):
+  def __init__(self, param_name, dims):
+    super().__init__(param_name)
+
+    self.dims = dims
+    self.build_prior_code()
+
+  def build_prior_code(self):
+    self.param_code = "  vector[" + str(self.dims) + "] " + self.name + ";"
+
+class UnconstrainedReal(Prior):
+  def __init__(self, param_name):
+    super().__init__(param_name)
+
+    self.dims = dims
+    self.build_prior_code()
+
+  def build_prior_code(self):
+    self.param_code = "  real " + self.name + ";"

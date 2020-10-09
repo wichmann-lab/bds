@@ -27,7 +27,7 @@ class BinomialMixture(LikelihoodModel):
   real deviance;
   real deviance_hat;
 
-  int resp_hat[N];
+  int Response_hat[N];
   int lapse_hat[N];""")
 
     self.generator = (
@@ -41,18 +41,18 @@ class BinomialMixture(LikelihoodModel):
 
     lapse_hat[n] = bernoulli_rng(""" + self.lps_prior.name + """);
     if (lapse_hat[n] == 0) {
-      resp_hat[n] = bernoulli_rng(decision[n]);
+      Response_hat[n] = bernoulli_rng(decision[n]);
     } else {
-      resp_hat[n] = bernoulli_rng(0.5);
+      Response_hat[n] = bernoulli_rng(0.5);
     }
-    lapse_log_lik_hat[n] = bernoulli_lpmf(resp_hat[n] | 0.5);
-    model_log_lik_hat[n] = bernoulli_lpmf(resp_hat[n] | decision[n]);
+    lapse_log_lik_hat[n] = bernoulli_lpmf(Response_hat[n] | 0.5);
+    model_log_lik_hat[n] = bernoulli_lpmf(Response_hat[n] | decision[n]);
     log_lik_hat[n] = log_mix(""" + self.lps_prior.name + """,
                              lapse_log_lik_hat[n],
                              model_log_lik_hat[n]);
 
     resid[n] = (2 * Response[n] - 1) * sqrt( -2 * log_lik[n]);
-    resid_hat[n] = (2 * resp_hat[n] - 1) * sqrt( -2 * log_lik_hat[n]);
+    resid_hat[n] = (2 * Response_hat[n] - 1) * sqrt( -2 * log_lik_hat[n]);
   }
 
   deviance = sum(square(resid));
@@ -81,11 +81,6 @@ class BinomialMixture(LikelihoodModel):
     result_obj.pvalues['residual reversals'] = pval2
     result_obj.ppc_residual_reversals = runs
 
-    pval3, flip_count, emp_rev = self.ppc_flip_count(result_obj)
-    result_obj.pvalues['flip count'] = pval3
-    result_obj.summary_statistics['flip count'] = emp_rev
-    result_obj.ppc_flip_count = flip_count
-
   def decision_probabilities(self, result_obj):
     dec_pars = ['decision[%d]' % x for x in range(1,result_obj.n+1)]
     probs = (result_obj.stan_fit.to_dataframe(pars=dec_pars, 
@@ -108,7 +103,7 @@ class BinomialMixture(LikelihoodModel):
     pass
 
   def ppc_responses(self, result_obj):
-    resp_pars = ['resp_hat[%d]' % x for x in range(1,result_obj.n+1)]
+    resp_pars = ['Response_hat[%d]' % x for x in range(1,result_obj.n+1)]
     responses = (result_obj.stan_fit.to_dataframe(pars=resp_pars, 
                                   inc_warmup=False,
                                   diagnostics=False)
@@ -192,21 +187,3 @@ class BinomialMixture(LikelihoodModel):
     print('Proportion of runs larger in empirical data:', pval)
 
     return (pval, run_df)
-
-  def ppc_flip_count(self, result_obj):
-    pp = result_obj.ppc_responses.T
-
-    def count_revs(a):
-      return np.sum(np.abs(np.diff(a, axis=0)), axis=0)
-
-    flips = count_revs(pp)
-    flip_df = pd.DataFrame({'runs': flips, 'origin': 'simulated'})
-
-    emp_rev = count_revs(result_obj.data['Response'].T)
-
-    pval = np.searchsorted(flips, emp_rev)/flips.shape[0]
-
-    print('Number of reversals:', emp_rev, '-- p-value:', pval)
-
-    return (pval, flip_df, emp_rev)
-

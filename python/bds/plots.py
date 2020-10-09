@@ -54,6 +54,49 @@ def plot_predictive_scale(scale):
           gg.geom_line() +
           gg.geom_ribbon(alpha=0.3));
 
+def plot_sensitivity_and_lapses(scale, arviz_data=None):
+  if arviz_data is None:
+    arviz_data = to_arviz(scale)
+
+  if scale.lapserate is not None:
+    ax = az.plot_violin(arviz_data, var_names = ['sensitivity', 'lapses'], sharex=False, sharey=False)
+  else:
+    ax = az.plot_violin(arviz_data, var_names = ['sensitivity'])
+  return ax
+
+def plot_traces(scale, arviz_data=None):
+  if arviz_data is None:
+    arviz_data = to_arviz(scale)
+
+  if scale.lapserate is not None:
+    return az.plot_trace(arviz_data, var_names = ['psi', 'sensitivity', 'lapses'])
+  else:
+    return az.plot_trace(arviz_data, var_names = ['psi', 'sensitivity'])
+
+def plot_ess(scale, kind='quantile', arviz_data=None):
+  if arviz_data is None:
+    arviz_data = to_arviz(scale)
+
+  if scale.lapserate is not None:
+    return az.plot_ess(arviz_data, kind=kind, var_names = ['psi', 'sensitivity', 'lapses'])
+  else:
+    return az.plot_ess(arviz_data, kind=kind, var_names = ['psi', 'sensitivity'])
+
+def plot_ppc(scale, arviz_data=None):
+  if arviz_data is None:
+    arviz_data = to_arviz(scale)
+
+  return az.plot_ppc(arviz_data, kind='cumulative', data_pairs={'Response': 'Response_hat'})
+
+def log_rhat(scale, arviz_data=None):
+  if arviz_data is None:
+    arviz_data = to_arviz(scale)
+
+  if scale.lapserate is not None:
+    return az.rhat(arviz_data, var_names = ['psi', 'sensitivity', 'lapses']).to_dataframe()
+  else:
+    return az.rhat(arviz_data, var_names = ['psi', 'sensitivity']).to_dataframe()
+
 def plot_posterior_samples(scale, samples=200):
   pp = scale.scale.T
   pp = pp[:, np.random.choice(pp.shape[1], samples, replace=False)]
@@ -75,7 +118,6 @@ from scipy.stats import norm
 
 def plot_residuals(scale):
   pr = np.mean(scale.decision_probabilities, axis=0)
-  lps = scale.get_lapserate()
 
   df = pd.DataFrame({'Delta(a,b,c)': norm.ppf(pr), 'probability': pr, 'response': scale.responses})
 
@@ -99,7 +141,7 @@ def compare_models_deviance(scales):
 def to_arviz(scale):
   return az.from_pystan(
     posterior=scale.stan_fit,
-    posterior_predictive='resp_hat',
+    posterior_predictive='Response_hat',
     observed_data=['Response'],
     log_likelihood={'Response': 'log_lik'},
     coords={'stimulus': np.arange(scale.stan_data['K']),
@@ -114,11 +156,14 @@ def to_arviz(scale):
           'resp_hat': ['trial']}
     )
 
-def compare_models_loo(scales):
+def compare_models_loo(scales, arviz_data = None):
   loo_data = pd.DataFrame()
 
   for n, sc in scales.items():
-    az_data = to_arviz(sc)
+    if arviz_data is None:
+      az_data = to_arviz(sc)
+    else:
+      az_data = arviz_data[n]
 
     loo = az.loo(az_data, scale='deviance')
     loo['model'] = n
@@ -128,3 +173,20 @@ def compare_models_loo(scales):
           gg.geom_point() +
           gg.geom_text(gg.aes(label='p_loo'), nudge_x=0.2, format_string='{:.2}') +
           gg.geom_errorbar())
+
+def compare_models_arviz(scales, arviz_data = None):
+  comp_data = dict()
+
+  for n, sc in scales.items():
+    if arviz_data is None:
+      az_data = to_arviz(sc)
+    else:
+      az_data = arviz_data[n]
+
+    comp_data[n] = az_data
+
+  model_compare = az.compare(comp_data, scale='deviance')
+
+  for n, sc in scales.items():
+    sc.loo = model_compare.loc[n]
+  return az.plot_compare(model_compare)

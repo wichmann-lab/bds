@@ -4,3 +4,4 @@ from .DirichletDistribution import DirichletDistribution
 from .NormalDistribution import NormalDistribution, VectorizedNormalDistribution, HalfNormalDistribution
 from .RaisedCosineDistribution import RaisedCosineDistribution
 from .UniformDistribution import UniformDistribution, VectorizedUniformDistribution
+from .Prior import UnconstrainedReal, UnconstrainedVector

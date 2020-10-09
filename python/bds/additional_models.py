@@ -28,14 +28,14 @@ bds_model_constant_lapses = BDSModel('bds_constant_lapses',
 sensory_noise_model = BDSModel('bds_sensory_noise',
                          likelihood = BinomialMixture(lapses_prior=BetaDistribution('lapses', {'lapsesAlpha': 1, 'lapsesBeta': 10})),
                          regressor = SensoryNoiseModel(link=SensoryNoiseProbitLink(),
-                                                 sensitivity_prior=RaisedCosineDistribution('sensitivity', {'sensitivityLowest': 0, 'sensitivityLow': 2.5, 'sensitivityHigh': 25, 'sensitivityHighest': 50})),
+                                                 sensitivity_prior=RaisedCosineDistribution('sensitivity', {'sensitivityLowest': 0, 'sensitivityLow': 5, 'sensitivityHigh': 50, 'sensitivityHighest': 100})),
                          scale = MonotonicScale(diff_prior=DirichletDistribution('psi_diff', 'K-1', {'psi_diffAlpha': 1})))
 
-abs_model = BDSModel('bds_sensory_noise',
+abs_model = BDSModel('bds_abs',
                          likelihood = BinomialMixture(lapses_prior=BetaDistribution('lapses', {'lapsesAlpha': 1, 'lapsesBeta': 10})),
                          regressor = DifferenceModel(link=ProbitLink(),
                                                  sensitivity_prior=RaisedCosineDistribution('sensitivity', {'sensitivityLowest': 0, 'sensitivityLow': 2.5, 'sensitivityHigh': 25, 'sensitivityHighest': 50})),
-                         scale = MonotonicScale(diff_prior=DirichletDistribution('psi_diff', 'K-1', {'psi_diffAlpha': 1})))
+                         scale = ParameterScale(scale_prior=UnconstrainedVector('psi_hat', 'K-2')))
 
 def bds_gp(data, stimulus, predictive, **kwargs):
   gp_dict = {'N_predict': len(predictive),
@@ -87,7 +87,8 @@ def bess(data, predictive, **kwargs):
 def bds_constant_lapserate(data, stimulus=None, lapserate=0.0, **kwargs):
 
   if not 'init' in kwargs.keys():
-    k = int(max(data[['S1','S2', 'S3']].max()))
+
+    k = int(max(data.loc[:, ('S1', 'S2', 'S3')].max()))
 
     init = lambda: {'psi_tilde': np.ones(k - 1) / k,
                     'sensitivity': bds_model_constant_lapses.hyper_params['sensitivityLow']}
@@ -101,7 +102,7 @@ def bds_constant_lapserate(data, stimulus=None, lapserate=0.0, **kwargs):
 def bds_sensory_noise(data, stimulus=None, **kwargs):
 
   if not 'init' in kwargs.keys():
-    k = int(max(data[['S1','S2', 'S3']].max()))
+    k = int(max(data.loc[:, ('S1', 'S2', 'S3')].max()))
 
     init = lambda: {'psi_tilde': np.ones(k - 1) / k,
                     'lapses': 0.01,
@@ -116,9 +117,9 @@ def bds_sensory_noise(data, stimulus=None, **kwargs):
 def bds_abs(data, stimulus=None, **kwargs):
 
   if not 'init' in kwargs.keys():
-    k = int(max(data[['S1','S2', 'S3']].max()))
+    k = int(max(data.loc[:, ('S1', 'S2', 'S3')].max()))
             
-    init = lambda: {'psi_tilde': np.ones(k - 1) / k,
+    init = lambda: {'psi_hat': np.linspace(0, 1, num=k)[1:-1],
                     'lapses': 0.01,
                     'sensitivity': abs_model.hyper_params['sensitivityLow']}
                                                       
