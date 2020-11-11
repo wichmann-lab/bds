@@ -58,8 +58,6 @@ plot_ordered_residuals(fit).draw();
 
 plot_reversals(fit).draw();
 
-plot_flip_count(fit).draw();
-
 plot_residuals(fit).draw();
 plt.show()
 

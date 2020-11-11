@@ -15,8 +15,8 @@ default_model = BDSModel('bds',
 def bds(data, stimulus=None, **kwargs):
 
   if not 'init' in kwargs.keys():
-    k = int(max(data.max()))
-    init = lambda: {'psi_tilde': np.ones(k - 1) / k,
+    k = int(max(data.loc[:, ('S1', 'S2', 'S3')].max()))
+    init = lambda: {'psi_diff': np.ones(k-1) / (k-1),
                     'lapses': 0.01,
                     'sensitivity': default_model.hyper_params['sensitivityLow']}
     

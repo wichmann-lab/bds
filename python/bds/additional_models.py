@@ -90,7 +90,7 @@ def bds_constant_lapserate(data, stimulus=None, lapserate=0.0, **kwargs):
 
     k = int(max(data.loc[:, ('S1', 'S2', 'S3')].max()))
 
-    init = lambda: {'psi_tilde': np.ones(k - 1) / k,
+    init = lambda: {'psi_diff': np.ones(k-1) / (k-1),
                     'sensitivity': bds_model_constant_lapses.hyper_params['sensitivityLow']}
                                                       
     kwargs['init'] = init
@@ -104,7 +104,7 @@ def bds_sensory_noise(data, stimulus=None, **kwargs):
   if not 'init' in kwargs.keys():
     k = int(max(data.loc[:, ('S1', 'S2', 'S3')].max()))
 
-    init = lambda: {'psi_tilde': np.ones(k - 1) / k,
+    init = lambda: {'psi_diff': np.ones(k-1) / (k-1),
                     'lapses': 0.01,
                     'sensitivity': sensory_noise_model.hyper_params['sensitivityLow']}
                                                       
