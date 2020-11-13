@@ -1,6 +1,8 @@
 setwd("../")
 source("plot_preprocess.R")
-setwd("sensitivity")
+setwd("example-scales")
+
+library(reshape2)
 
 dat <- read.csv('../../data/bds-sqrt-11-330-10-0.05-sim.csv', sep = '\t')
 dat[['id']] <- c(as.vector(sapply(1:144, rep, times=17)), as.vector(sapply(1:144, rep, times=19)))
@@ -40,12 +42,12 @@ datsummary <- datmelt %>% group_by(method, variable) %>% summarize(low = quantil
 datsummary$stim <- sapply(datsummary$variable, function(x) stimulus[[toString(x)]])
 
 summary.plt <- ggplot(datsummary, aes(x=stim, y=m, colour=method, shape=method)) +
-  stat_function(aes(colour='ground truth', shape='ground truth'), fun=function(x) function.zoo[['sqrt']](x)*10) +
+  stat_function(aes(colour='ground truth', shape='ground truth'), fun=function(x) function.zoo[['sqrt']](x)*8.5, linetype='dashed') +
   geom_line(aes(x=stim, y=low), linetype = "dotted") +
   geom_line(aes(x=stim, y=high), linetype = "dotted") +
   geom_ribbon(aes(x=stim, ymin=low, ymax=high), alpha =0.05, linetype = "blank") +
   geom_line() + geom_point() +
-  scale_colour_manual(values=solpal5[c(1,4,2)], labels=c('MLDS', 'ground truth', 'BDS')) +
+  scale_colour_manual(values=c(solpal5[[1]], 'grey', solpal5[[2]]), labels=c('MLDS', 'ground truth', 'BDS')) +
   scale_shape_manual(values = c(15, 32, 17), labels=c('MLDS', 'ground truth', 'BDS')) +
   xlab("stimulus") + ylab("estimated scale") +
   scale_y_continuous(limits = c(0, NA), breaks = c(10)) +

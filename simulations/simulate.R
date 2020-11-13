@@ -111,8 +111,11 @@ asym.bootstrap <- function(asym.fit) {
 }
 
 run.mlds <- function(simlist, lps, levels, function.name) {
-  df <- data.frame(sc=numeric(), ci.low=numeric(), ci.high=numeric(), pos=factor(), method=factor(), fn=factor(), lps=numeric(), lvl=numeric(), trials=numeric(), sens=numeric())
-    for(sim in simlist[['simulations']]) {
+  df <- data.frame(id=numeric(), sc=numeric(), ci.low=numeric(), ci.high=numeric(), pos=factor(), method=factor(), fn=factor(), lps=numeric(), lvl=numeric(), trials=numeric(), sens=numeric())
+
+  id.counter <- 0
+  
+  for(sim in simlist[['simulations']]) {
 
     time.mlds <- system.time({
       fit <- mlds(sim, seq(0,1,len=levels))
@@ -145,7 +148,8 @@ run.mlds <- function(simlist, lps, levels, function.name) {
     pos <- c(0, levels-1, 1:(levels-2), 'sigma', 'p-value', 'disjoint', 'utime', 'stime', 'rtime')
     method <- c(rep('glm', times=levels+6))
 
-    df <- rbind(df, data.frame(sc=sc,
+    df <- rbind(df, data.frame(id=id.counter,
+                               sc=sc,
                                gt=gt,
                                ci.low=ci.low,
                                ci.high=ci.high,
@@ -156,6 +160,7 @@ run.mlds <- function(simlist, lps, levels, function.name) {
                                lvl=rep(simlist[['lvl']], times=levels+6),
                                trials=rep(simlist[['trials']], times=levels+6),
                                sens=rep(simlist[['sens']], times=levels+6)))
+    id.counter <- id.counter + 1
   }
 
   df
@@ -177,6 +182,8 @@ run.stan.lapse <- function(simlist, lps, levels, function.name, stimulus) {
   }
   init_list <- rep(list(init_fun()), times=4)
 
+  id.counter <- 0
+  
   for (sim in simlist[['simulations']]) {
   
     time.hmc <- system.time({
@@ -186,7 +193,10 @@ run.stan.lapse <- function(simlist, lps, levels, function.name, stimulus) {
                       init_list=init_list,
                       .cores=1)
 
+      diagnostics <- convergence.check(fitobj$stanfit)
+      
       fit <- lps.model$extractor(fitobj$stanfit, stimulus, fitobj$data)
+
       disjoint <- ppc_ordered_residuals(fit)$disjoint
       pval <- ppc_residual_run(fit)$pval
     })
@@ -196,25 +206,32 @@ run.stan.lapse <- function(simlist, lps, levels, function.name, stimulus) {
     rtime <- time.hmc[3]
 
     sampler_params <- get_sampler_params(fit$stanfit, inc_warmup = FALSE)
-    divergent <- mean(sapply(sampler_params, function(x) mean(x[, "divergent__"])))
 
-    sc <- c(get_scale_values(fit), get_sensitivity(fit), get_lapserate(fit), pval, disjoint, utime, stime, rtime, divergent)
-    gt <- c(simlist[['scale']], simlist[['sens']], lps, rep(NA, times=6))
-    ci.low <- c(get_scale_credible_interval(fit)$ci.low, get_sensitivity_credible_interval(fit)$ci.low, get_lapserate_credible_interval(fit)$ci.low, rep(NA, times=6))
-    ci.high <- c(get_scale_credible_interval(fit)$ci.high, get_sensitivity_credible_interval(fit)$ci.high, get_lapserate_credible_interval(fit)$ci.high, rep(NA, times=6))
-    pos <- c(0:(levels-1), 'sigma', 'lambda', 'p-value', 'disjoint', 'utime', 'stime', 'rtime', 'divergent')
+    divergent <- sum(diagnostics$chain.divergence)
+    div.chains <- length(diagnostics$chain.divergence)
+    max.rhat <- max(diagnostics$diagnostics$rhat)
+    min.ess <- min(c(diagnostics$diagnostics$ess.tail,diagnostics$diagnostics$ess.bulk))
+    
+    sc <- c(get_scale_values(fit), get_sensitivity(fit), get_lapserate(fit), pval, disjoint, utime, stime, rtime, divergent, div.chains, max.rhat, min.ess)
+    gt <- c(simlist[['scale']], simlist[['sens']], lps, rep(NA, times=9))
+    ci.low <- c(get_scale_credible_interval(fit)$ci.low, get_sensitivity_credible_interval(fit)$ci.low, get_lapserate_credible_interval(fit)$ci.low, rep(NA, times=9))
+    ci.high <- c(get_scale_credible_interval(fit)$ci.high, get_sensitivity_credible_interval(fit)$ci.high, get_lapserate_credible_interval(fit)$ci.high, rep(NA, times=9))
+    pos <- c(0:(levels-1), 'sigma', 'lambda', 'p-value', 'disjoint', 'utime', 'stime', 'rtime', 'divergent', 'div_chains', 'max-rhat', 'min-ess')
 
-    df <- rbind(df, data.frame(sc=sc,
+    df <- rbind(df, data.frame(id=id.counter,
+                               sc=sc,
                                gt=gt,
                                ci.low=ci.low,
                                ci.high=ci.high,
                                pos=pos,
-                               method=rep('mixture', times=levels+8),
-                               fn=rep(function.name, times=levels+8),
-                               lps=rep(lps, times=levels+8),
-                               lvl=rep(simlist[['lvl']], times=levels+8),
-                               trials=rep(simlist[['trials']], times=levels+8),
-                               sens=rep(simlist[['sens']], times=levels+8)))
+                               method=rep('mixture', times=levels+11),
+                               fn=rep(function.name, times=levels+11),
+                               lps=rep(lps, times=levels+11),
+                               lvl=rep(simlist[['lvl']], times=levels+11),
+                               trials=rep(simlist[['trials']], times=levels+11),
+                               sens=rep(simlist[['sens']], times=levels+11)))
+    
+    id.counter <- id.counter + 1
   }
 
   df
@@ -243,10 +260,16 @@ run.simulations <- function(name, fun, stim, fn, lvl, tr, pr, lapse, sdt=FALSE, 
                             lps=numeric(), lvl=numeric(), trials=numeric(), sens=numeric())
 
     # generate simulations for current lapserate
-    sim.lst <- simulate.responses(intensities=stim, trials=tr, simulations=num.sims, sensitivity=pr,
+    if (! file.exists(paste(paste0('data/', name), fn, lvl, tr, pr, lapse, 'virt_exp.RData', sep = '-'))) {
+      sim.lst <- simulate.responses(intensities=stim, trials=tr, simulations=num.sims, sensitivity=pr,
                                   scalefun=fun, lapserate=lapse,
                                   sdt=sdt)
-
+      
+      save(sim.lst, file=paste(paste0('data/', name), fn, lvl, tr, pr, lapse, 'virt_exp.RData', sep = '-'))
+    } else {
+      load(paste(paste0('data/', name), fn, lvl, tr, pr, lapse, 'virt_exp.RData', sep = '-'))
+    }
+    
     num.lvl <- length(stim)
     lapses.df <- rbind(lapses.df, run.mlds(sim.lst, lapse, num.lvl, fn))
 #    lapses.df <- rbind(lapses.df, run.stan(sim.lst, lapse, num.lvl, fn))

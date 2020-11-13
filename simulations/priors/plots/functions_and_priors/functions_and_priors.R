@@ -202,8 +202,8 @@ save_plot("scale_value_error_metrics.svg", sc.err.plt, base_width = 1.5, base_he
 
 ## 
 
-points = data.frame(response = c(1, 0, 0, 1, 1, 0, 1, 1),
-                    delta = c(-2.0, -1.3, -0.6, -0.3, 0.5, 0.9, 1.6, 2.0))
+points = data.frame(response = c(0, 0, 1, 0, 0, 1, 1, 0, 1, 1, 1, 1),
+                    delta = c(-3, -2.4, -2.0, -1.3, -0.6, -0.3, 0.5, 0.9, 1.6, 2.0, 2.6, 3.0))
 
 points$probs <- pnorm(points$delta)
 points$resid <- sign(points$response-points$probs) * sqrt(-2*log(points$probs*points$response + (1-points$probs)*(1-points$response)))
@@ -214,7 +214,7 @@ residuals.plt <- ggplot(points, aes(x=delta, y=response)) +
   stat_function(fun=pnorm, colour="#D40000") +
   scale_colour_viridis_c(option="D", limits=c(-3, 3)) +
   scale_y_continuous(breaks = c(0,1), labels = c('0', '1')) +
-  xlim(-2.5, 2.5) +
+  xlim(-4, 4) +
   geom_point(aes(y=probs), colour="#D40000") +
   theme(legend.position='none',
 #        axis.text = element_text(size=6),
@@ -230,9 +230,11 @@ sorted_resid.plt <- ggplot(points, aes(y=rank(resid), x=resid, yend=rank(resid),
   xlab("deviance residuals") +
   ylab("sort index") +
   geom_point() +
+  xlim(-3,3) +
   scale_colour_viridis_c(option="D", limits=c(-3, 3)) +
   theme(legend.position='none',
-#        axis.text = element_text(size=6),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
 #        axis.title.y = element_blank(),
 #        axis.title.x = element_text(size=8),
         plot.margin = unit(c(0,0,0,0), "pt"))
@@ -242,7 +244,7 @@ save_plot("sorted_resid.svg", sorted_resid.plt, base_width = 2.5, base_height = 
 reversals.plt <- ggplot(points, aes(x=delta, y=response)) +
   geom_point(size=2.5, shape=15) +
   scale_y_continuous(breaks = c(0,1), labels = c('0', '1')) +
-  xlim(-2.5, 2.5) +
+  xlim(-4, 4) +
   theme(legend.position='none',
 #        axis.text = element_text(size=6),
         axis.title.y = element_blank(),

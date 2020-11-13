@@ -1,5 +1,9 @@
+library(ggplot2)
 library(cowplot)
+library(viridis)
 library(dplyr)
+
+theme_set(theme_cowplot())
 
 solarized <- c(base03 = '#002b36',
                base02 = '#073642',
@@ -20,7 +24,7 @@ solarized <- c(base03 = '#002b36',
 
 solpal5 <- solarized[c('red','blue','yellow','base02','base1')]
 solpal5 <- unname(solpal5)
-scale_colour_viridis = scale_colour_viridis_d(option="C", begin=.1, end=.9, direction= -1)
+scale_colour_viridis = scale_color_viridis(option="C", begin=.1, end=.9, direction= -1, discrete = TRUE)
 
 munsell <- function(x, ref) ifelse( (x/ref) <= (6. / 29) ^ 3,
                                     11.6 * 841. / 108 * x/ref + 4. / 29 - 1.6,
@@ -47,6 +51,10 @@ for (f in files) {
   
   dat <- read.csv(paste0('../data/', f), sep = '\t')
   
+#  id <- c(0:2447 %/% 17, 0:2735 %/% 19)
+#  dat$simid <- id
+#  write.table(dat, paste0('../data/', f), row.names=FALSE, sep='\t')
+
   data.df <- rbind(data.df, dat)
 }
 
@@ -59,4 +67,15 @@ for (f in files.smallN) {
   dat <- read.csv(paste0('../data/', f), sep = '\t')
   
   smallN.df <- rbind(smallN.df, dat)
+}
+
+files.fullsep <- list.files(path = "../data", pattern = 'sep[[:print:]]+.csv')
+
+fullsep.df <- data.frame()
+
+for (f in files.fullsep) {
+  
+  dat <- read.csv(paste0('../data/', f), sep = '\t')
+  
+  fullsep.df <- rbind(fullsep.df, dat)
 }

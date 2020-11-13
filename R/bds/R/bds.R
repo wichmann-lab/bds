@@ -116,3 +116,42 @@ sample_bds_model <- function(model_obj,
 
   list(stanfit=fit, data=data)
 }
+
+convergence.check <- function(stanfit) {
+  arr <- extract(stanfit, permuted=FALSE, pars=c('psi', 'sensitivity', 'lapses'))
+  M <- ncol(arr)
+  N <- nrow(arr)
+
+  df <- data.frame(par=factor(), rhat=numeric(), ess.bulk=numeric(), ess.tail=numeric())
+
+  warnings <- c(rhat=FALSE, ess.bulk=FALSE, ess.tail=FALSE, div=FALSE)
+
+  for (par in dimnames(arr)$parameters) {
+    rhat <- Rhat(arr[,,par])
+    ess.b <- ess_bulk(arr[,,par])
+    ess.t <- ess_tail(arr[,,par])
+
+    if (rhat > 1.05) {
+      warnings['rhat'] <- TRUE
+    }
+
+    if (ess.b < M*100) {
+      warnings['ess.bulk'] <- TRUE
+    }
+
+    if (ess.t < M*100) {
+      warnings['ess.tail'] <- TRUE
+    }
+
+    df <- rbind(df, data.frame(par=par, rhat=rhat, ess.bulk=ess.b, ess.tail=ess.t))
+  }
+
+  div <- get_divergent_iterations(stanfit)
+  chains.div <- table((which(div)-1) %/% N + 1)
+
+  if (length(chains.div) > 0) {
+    warnings['div'] = TRUE
+  }
+
+  list(diagnostics=df, chain.divergence=chains.div, warnings=warnings)
+}
