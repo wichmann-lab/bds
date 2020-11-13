@@ -29,7 +29,8 @@ simulate.responses <- function(intensities,
                                sensitivity=10,
                                lapserate=0.0,
                                scalefun=function(x) x^(1/2),
-                               sdt=FALSE) {
+                               sdt=FALSE,
+                               complete.separation=FALSE) {
 
   # Generate triads corresponding to the number of trials
   num_intens <- length(intensities)
@@ -52,6 +53,9 @@ simulate.responses <- function(intensities,
       det_noise <- 1/(2*sensitivity)
       decision <- mapply(function(a, b, c) abs(rnorm(1, Sc[c], det_noise) - rnorm(1, Sc[b], det_noise)) -
                                               abs(rnorm(1, Sc[b], det_noise) - rnorm(1, Sc[a], det_noise)),
+                         Tr[,1], Tr[,2], Tr[,3])
+    } else if (complete.separation) {
+      decision <- mapply(function(a, b, c) Sc[a] - 2*Sc[b] + Sc[c],
                          Tr[,1], Tr[,2], Tr[,3])
     } else {
       decision <- mapply(function(a, b, c) rnorm(1, Sc[a] - 2*Sc[b] + Sc[c], 1/sensitivity),
@@ -253,7 +257,7 @@ function.zoo <- list('square'    = function(x) x^2,
                      'munsell'   = function(x) (munsell(x, 1.0)-munsell(0.0, 1.0))/(munsell(1.0, 1.0)-munsell(0.0, 1.0))
                     )
 
-run.simulations <- function(name, fun, stim, fn, lvl, tr, pr, lapse, sdt=FALSE, num.sims=144) {
+run.simulations <- function(name, fun, stim, fn, lvl, tr, pr, lapse, sdt=FALSE, complete.separation=FALSE, num.sims=144) {
   if (! file.exists(paste(paste0('data/', name), fn, lvl, tr, pr, lapse, 'sim.csv', sep = '-'))) {
     lapses.df <- data.frame(sc=numeric(), gt=numeric(), ci.low=numeric(), ci.high=numeric(),
                             pos=factor(), method=factor(), fn=factor(),
@@ -263,7 +267,7 @@ run.simulations <- function(name, fun, stim, fn, lvl, tr, pr, lapse, sdt=FALSE, 
     if (! file.exists(paste(paste0('data/', name), fn, lvl, tr, pr, lapse, 'virt_exp.RData', sep = '-'))) {
       sim.lst <- simulate.responses(intensities=stim, trials=tr, simulations=num.sims, sensitivity=pr,
                                   scalefun=fun, lapserate=lapse,
-                                  sdt=sdt)
+                                  sdt=sdt, complete.separation=complete.separation)
       
       save(sim.lst, file=paste(paste0('data/', name), fn, lvl, tr, pr, lapse, 'virt_exp.RData', sep = '-'))
     } else {
@@ -291,7 +295,8 @@ simulate <- function(factor.name,
                             num.trials=list(1000),
                             sensitivities=list(10),
                             num.sims=144,
-                            sdt=FALSE) {
+                            sdt=FALSE,
+                            complete.separation=FALSE) {
 
 
   sim_params <- expand.grid(name=factor.name,
@@ -326,9 +331,9 @@ simulate <- function(factor.name,
          sim_params$tr,
          sim_params$pr,
          sim_params$lapse,
-         MoreArgs = list(sdt=sdt, num.sims=num.sims),
+         MoreArgs = list(sdt=sdt, num.sims=num.sims, complete.separation = complete.separation),
          mc.silent = TRUE,
          mc.preschedule = FALSE,
-         mc.cores=24
+         mc.cores=18
          )
 }
