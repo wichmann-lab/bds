@@ -155,3 +155,28 @@ convergence.check <- function(stanfit) {
 
   list(diagnostics=df, chain.divergence=chains.div, warnings=warnings)
 }
+
+grid.eval <- function() {
+  
+  sc.len <- 
+  sc.prior <- ddirichlet(rep(0, sc.len),rep(1, sc.len), log=TRUE)
+  lps.zero.prior <- dbeta(0.0, 1, 5, log.p=TRUE)
+  
+  for (sc in scales) {
+  
+    delta.regr <- design.matrix %*% sc
+  
+    for (sens in sensitivities) {
+    
+      decision.prob <- pnorm(sens * delta.regr)
+      loglik <- sum(dbinom(resp, 1, decision.prob, log = TRUE))
+      
+      density <- loglik + sens.prior + sc.prior + lps.zero.prior
+      for (lps in lapses) {
+        loglik.mix <- logSumExp(log(1-lps)+loglik, log(lps) + 0.5)
+        
+        density <- loglik.mix + sens.prior + lps.prior + sc.prior
+      }
+    }
+  }
+}
