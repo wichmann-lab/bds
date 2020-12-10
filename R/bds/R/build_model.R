@@ -281,6 +281,25 @@ psi.uniform <- list(
   default = list()
   )
 
+psi.unconstrained <- list(
+  fn = "",
+  data = "",
+  trdata = "",
+  param = "  vector[K-2] psi;\n",
+
+  trparam = "  vector[N] decision;
+  vector[K-1] psi_ext;
+
+  for (k in 1:K-2) {
+    psi_ext[k] = psi[k];
+  }
+  psi_ext[K-1] = 1;
+
+  decision = Phi(X * psi_ext * sensitivity);\n",
+
+  model = "",
+  default = list()
+)
 
 psi.dirichlet <- list(
   fn = "",

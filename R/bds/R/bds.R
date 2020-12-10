@@ -110,7 +110,7 @@ sample_bds_model <- function(model_obj,
                   warmup = 1000,
                   iter = 3500, chains=length(init_list),
 #                  include = FALSE, pars = c("psi_ext", "decision"),
-                  control = list(adapt_delta = 0.99),
+                  control = list(adapt_delta = 0.999),
                   init=init_list,
                   cores=.cores)
 
@@ -156,25 +156,35 @@ convergence.check <- function(stanfit) {
   list(diagnostics=df, chain.divergence=chains.div, warnings=warnings)
 }
 
-grid.eval <- function() {
-  
-  sc.len <- 
-  sc.prior <- ddirichlet(rep(0, sc.len),rep(1, sc.len), log=TRUE)
-  lps.zero.prior <- dbeta(0.0, 1, 5, log.p=TRUE)
-  
+grid.eval <- function(diff_scale) {
+  pmean <- c(lapses=diff_scale$lapserate,sensitivity=diff_scale$sensitivity,diff(diff_scale$scale))
+
+  log_posterior <- function(x) {
+    pars <- list(lapses=x[1], sensitivity=x[2], psi_diff=x[3:length(x)])
+    lp <- tryCatch(-log_prob(diff_scale$stanfit, unconstrain_pars(diff_scale$stanfit, pars)),error=function(cond) return(Inf))
+
+    return(lp)
+  }
+
+  map.estim <- optim(pmean, log_posterior)$par
+
+#  sc.len <-
+#  sc.prior <- ddirichlet(rep(0, sc.len),rep(1, sc.len), log=TRUE)
+#  lps.zero.prior <- dbeta(0.0, 1, 5, log.p=TRUE)
+
   for (sc in scales) {
-  
+
     delta.regr <- design.matrix %*% sc
-  
+
     for (sens in sensitivities) {
-    
+
       decision.prob <- pnorm(sens * delta.regr)
       loglik <- sum(dbinom(resp, 1, decision.prob, log = TRUE))
-      
+
       density <- loglik + sens.prior + sc.prior + lps.zero.prior
       for (lps in lapses) {
         loglik.mix <- logSumExp(log(1-lps)+loglik, log(lps) + 0.5)
-        
+
         density <- loglik.mix + sens.prior + lps.prior + sc.prior
       }
     }
