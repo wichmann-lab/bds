@@ -110,4 +110,4 @@ venv.bak/
 
 *.pdf
 *.Rproj
-.RData
+*.RData

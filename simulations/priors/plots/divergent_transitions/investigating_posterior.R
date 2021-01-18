@@ -4,6 +4,8 @@ library(dplyr)
 library(parallel)
 library(cowplot)
 
+options(mc.cores=parallel::detectCores())
+
 solarized <- c(base03 = '#002b36',
                base02 = '#073642',
                base01 = '#486e75',
@@ -44,6 +46,8 @@ grid.eval <- function(name, diff_scale) {
   post.draws <- extract(diff_scale$stanfit,c("lapses", "sensitivity", "psi", "psi_diff"))
   sens <- seq(2.5, max(post.draws$sensitivity, 30), len=100)
   lps <- seq(0.001, max(post.draws$lapses, .1), len=100)
+  lps.step <- lps[2] - lps[1]
+  sens.step <- sens[2] - sens[1]
 
   v <- expand.grid(lps, sens)
   
@@ -55,18 +59,19 @@ grid.eval <- function(name, diff_scale) {
   }
   
   grid.lps_sens <- function (id) {
+    if (!file.exists(paste0('eval/', name, '_', id, '.tsv'))) {
     sc <- post.draws$psi_diff[id,]
     v$lp <- apply(v, 1, lp, psi_diff = sc)
     
     write.table(v, file=paste0('eval/', name, '_', id, '.tsv'), sep='\t')
-    
-    lps.step <- v$lps[2] - v$lps[1]
-    sens.step <- v$sens[2] - v$sens[1]
+    } else {
+        v <- read.table(paste0('eval/', name, '_', id, '.tsv'), sep="\t")
+    }
     
     matrixStats::logSumExp(v$lp+log(lps.step)+log(sens.step))
   }
   
-  sc.lp <- mcmapply(grid.lps_sens, 1:length(post.draws$psi_diff[,1]))
+  sc.lp <- mcmapply(grid.lps_sens, 1:length(post.draws$psi_diff[,1]), mc.cores=detectCores())
 }
 
 plot.diagnostics <- function(name, diff_scale) {
@@ -195,8 +200,8 @@ animate.posterior_landscape <- function(name, diff_scale, sc.lp) {
     
     smp <- c(post.draws$lapses[id], post.draws$sensitivity[id])
     p <- ggplot() + 
-      geom_raster(data=v, aes(x=Var1, y=Var2, fill=-lp)) +
-      geom_contour(data=v, aes(x=Var1, y=Var2, z=-lp), binwidth=5, colour=solpal5[5]) +
+      geom_raster(data=v, aes(x=Var1, y=Var2, fill=lp)) +
+      geom_contour(data=v, aes(x=Var1, y=Var2, z=lp), binwidth=5, colour=solpal5[5]) +
       geom_point(data=data.frame(Var1=c(map[1], pmean[1], map2[1], smp[1]), Var2=c(map[2], pmean[2], map2[2], smp[2]), method=c('MAP', 'mean', 'local max', 'HMC sample')), aes(x=Var1, y=Var2, colour=method, shape=method), size=3) +
       xlab('lapserate') +
       ylab('sensitivity') +
@@ -225,8 +230,8 @@ diff_scale.nodiv <- bds(sim.nodiv)
 
 plot.diagnostics("nodiv", diff_scale.nodiv)
 
-sc.lp.div <- grid.eval("nodiv", diff_scale)
-animate.posterior_landscape("nodiv", diff_scale, sc.lp)
+sc.lp.nodiv <- grid.eval("nodiv", diff_scale.nodiv)
+animate.posterior_landscape("nodiv", diff_scale.nodiv, sc.lp.nodiv)
 
 # divergent transitions
 
@@ -247,4 +252,4 @@ diff_scale.div <- bds(sim.div)
 plot.diagnostics("div", diff_scale.div)
 
 sc.lp.div <- grid.eval("div", diff_scale.div)
-animate.posterior_landscape("div", diff_scale.div, sc.lp)
+animate.posterior_landscape("div", diff_scale.div, sc.lp.div)
