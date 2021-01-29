@@ -218,7 +218,59 @@ animate.posterior_landscape <- function(name, diff_scale, sc.lp) {
 #  system(paste0("ffmpeg -framerate 25 -i anim/", name,"%004d.jpg-c:v libx264 -profile:v high -crf 20 -pix_fmt yuv420p ", name, ".mp4 "))
 }
 
+summarize.posterior <- function(name, diff_scale, sc.lp) {
+  log_posterior <- function(x) {
+    pars <- list(lapses=x[1], sensitivity=x[2], psi_diff=x[3:length(x)])
+    lp <- tryCatch(-log_prob(diff_scale$stanfit, unconstrain_pars(diff_scale$stanfit, pars)),error=function(cond) return(Inf))
+  
+    return(lp)
+  }
+  
+  lp <- function(sl, psi_diff=pmean[3:length(pmean)]) {
+    x <- c(sl[[1]], sl[[2]], psi_diff)
+    log_posterior(x)
+  }
+  
+  pmean <- c(lapses=diff_scale$lapserate,sensitivity=diff_scale$sensitivity,diff(diff_scale$scale))
+  post.draws <- extract(diff_scale$stanfit,c("lapses", "sensitivity", "psi", "psi_diff"))
 
+  map <- optim(pmean, log_posterior)$par
+  map.local <- optim(map[1:2], lp)$par
+  map2.fit <- optim(c(map.local, map[3:length(map)]), log_posterior)
+  map <- map2.fit$par
+
+  fill_scale <- scale_fill_viridis_c(name="log likelihood", option="inferno")
+
+  post.lp <- data.frame()
+  for (id in order(sc.lp)) {
+    v <- read.table(paste0('eval/', name, '_', id, '.tsv'), sep="\t")
+    
+    if (nrow(post.lp) == 0) {
+      post.lp <- v
+    } else {
+      post.lp$lp <- log(exp(post.lp$lp) + exp(v$lp))
+    }
+  }
+  
+  means <- c(lps.mean=sum(exp(post.lp$lp)/sum(exp(post.lp$lp))*post.lp$Var1), sens.mean=sum(exp(post.lp$lp)/sum(exp(post.lp$lp))*post.lp$Var2))
+  
+  p <- ggplot() + 
+    geom_raster(data=post.lp, aes(x=Var1, y=Var2, fill=lp)) +
+    geom_point(data=data.frame(Var1=post.draws$lapses, Var2=post.draws$sensitivity), aes(x=Var1, y=Var2), alpha=0.1) +
+    geom_contour(data=post.lp, aes(x=Var1, y=Var2, z=lp), binwidth=5, colour=solpal5[5]) +
+    geom_point(data=data.frame(Var1=c(map[1], pmean[1], means[1]), Var2=c(map[2], pmean[2], means[2]), method=c('MAP', 'sample mean', 'posterior mean')), aes(x=Var1, y=Var2, colour=method, shape=method), size=3) +
+    xlab('lapserate') +
+    ylab('sensitivity') +
+    ggtitle(name) +
+    fill_scale +
+    scale_colour_manual(name="point estimates", values=solpal5[c(5,2,1)]) +
+    scale_shape_manual(name="point estimates", values=c(1, 4, 17)) +
+    theme_classic()
+  
+  ggsave(paste0(name, "_full.pdf"), p)
+
+  means
+}
 
 setwd("~/Projects/bds/simulations/priors/plots/divergent_transitions/")
 load("~/Projects/bds/simulations/priors/plots/divergent_transitions/demo-square-11-330-10-0.01-virt_exp.RData")
@@ -231,7 +283,8 @@ diff_scale.nodiv <- bds(sim.nodiv)
 plot.diagnostics("nodiv", diff_scale.nodiv)
 
 sc.lp.nodiv <- grid.eval("nodiv", diff_scale.nodiv)
-animate.posterior_landscape("nodiv", diff_scale.nodiv, sc.lp.nodiv)
+summarize.posterior("nodiv", diff_scale.nodiv, sc.lp.nodiv)
+#animate.posterior_landscape("nodiv", diff_scale.nodiv, sc.lp.nodiv)
 
 # divergent transitions
 
@@ -252,4 +305,5 @@ diff_scale.div <- bds(sim.div)
 plot.diagnostics("div", diff_scale.div)
 
 sc.lp.div <- grid.eval("div", diff_scale.div)
-animate.posterior_landscape("div", diff_scale.div, sc.lp.div)
+summarize.posterior("div", diff_scale.div, sc.lp.div)
+#animate.posterior_landscape("div", diff_scale.div, sc.lp.div)
