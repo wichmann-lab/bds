@@ -40,7 +40,8 @@ order_data <- function(mlds_data) {
 bds <- function(mlds_data,
                 stimulus=NULL,
                 fit.lapses=TRUE,
-                .cores=getOption('mc.cores', default = 1L)) {
+                .cores=getOption('mc.cores', default = 1L),
+		adapt_delta=0.9) {
 
   if (is.null(stimulus)) {
     if (ncol(mlds_data) == 4) {
@@ -72,7 +73,7 @@ bds <- function(mlds_data,
 
   model_obj <- stan_model(model_code=md$model_code)
 
-  stanfit <- sample_bds_model(model_obj, mlds_data, prior_params=md$default_params, init_list = rep(list(init_fun()), times=4), .cores=.cores)
+  stanfit <- sample_bds_model(model_obj, mlds_data, prior_params=md$default_params, init_list = rep(list(init_fun()), times=4), .cores=.cores, adapt_delta=adapt_delta)
 
   md$extractor(stanfit$stanfit, stimulus, stanfit$data)
 }
@@ -81,7 +82,8 @@ sample_bds_model <- function(model_obj,
                              mlds_data,
                              prior_params,
                              init_list,
-                             .cores=getOption('mc.cores', default = 1L)) {
+                             .cores=getOption('mc.cores', default = 1L),
+			     adapt_delta=0.9) {
   mlds_data.ordered <- order_data(mlds_data)
 
   data = c(list(N = length(mlds_data[,1])),
@@ -110,7 +112,7 @@ sample_bds_model <- function(model_obj,
                   warmup = 1000,
                   iter = 3500, chains=length(init_list),
 #                  include = FALSE, pars = c("psi_ext", "decision"),
-                  control = list(adapt_delta = 0.999),
+                  control = list(adapt_delta = adapt_delta),
                   init=init_list,
                   cores=.cores)
 
