@@ -158,6 +158,23 @@ convergence.check <- function(stanfit) {
   list(diagnostics=df, chain.divergence=chains.div, warnings=warnings)
 }
 
+create.design_matrix <- function(diff_scale) {
+  k <- diff_scale$K
+
+  expand_row <- function(s1, s2, s3, s4) {
+    r <- rep(0, k)
+
+    r[s1] <- 1
+    r[s2] <- r[s2] - 1
+    r[s3] <- r[s3] - 1
+    r[s4] <- 1
+
+    return(r[2:k])
+  }
+
+  return(t(mapply(expand_row, diff_scale$S1, diff_scale$S2, diff_scale$S3, diff_scale$S4, SIMPLIFY = TRUE)))
+}
+
 grid.eval <- function(diff_scale) {
   pmean <- c(lapses=diff_scale$lapserate,sensitivity=diff_scale$sensitivity,diff(diff_scale$scale))
 
@@ -168,11 +185,33 @@ grid.eval <- function(diff_scale) {
     return(lp)
   }
 
+  draised.single <- function(y, start, u1, u2, end) {
+    if (start < y && y < u1) {
+      res = log(0.5-0.5*cos(pi/(u1-start)*(y-start)));
+    } else if (y > u2 && y < end) {
+      res = log(0.5+0.5*cos(pi/(end-u2)*(y-u2)));
+    } else if (u1 <= y && y <= u2) {
+      res = 0.0;
+    } else {
+      res = -Inf
+    }
+
+    res
+  }
+
+  draised <- function(x, a, b, c, d) {
+    return(sapply(x, draised.single, start=a, u1=b, u2=c, end=d))
+  }
+
   map.estim <- optim(pmean, log_posterior)$par
 
-#  sc.len <-
-#  sc.prior <- ddirichlet(rep(0, sc.len),rep(1, sc.len), log=TRUE)
-#  lps.zero.prior <- dbeta(0.0, 1, 5, log.p=TRUE)
+  design.matrix <- create.design_matrix(diff_scale)
+  sc.len <- diff_scale$K - 1
+  sc.prior <- ddirichlet(rep(0, sc.len-1),rep(1, sc.len-1), log=TRUE)
+  lps.zero.prior <- dbeta(0.0, 1, 5, log.p=TRUE)
+
+  sens.prior <- draised(sensitivities, 2.5, 5, 25, 50)
+  lps.prior <- dbeta(lapses, 1, 5, log.p=TRUE)
 
   for (sc in scales) {
 
@@ -183,7 +222,7 @@ grid.eval <- function(diff_scale) {
       decision.prob <- pnorm(sens * delta.regr)
       loglik <- sum(dbinom(resp, 1, decision.prob, log = TRUE))
 
-      density <- loglik + sens.prior + sc.prior + lps.zero.prior
+      density.nolapse <- loglik + sens.prior + sc.prior + lps.zero.prior
       for (lps in lapses) {
         loglik.mix <- logSumExp(log(1-lps)+loglik, log(lps) + 0.5)
 
