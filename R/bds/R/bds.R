@@ -175,7 +175,7 @@ create.design_matrix <- function(diff_scale) {
   return(t(mapply(expand_row, diff_scale$S1, diff_scale$S2, diff_scale$S3, diff_scale$S4, SIMPLIFY = TRUE)))
 }
 
-grid.eval <- function(diff_scale) {
+grid.eval <- function(diff_scale, sensitivities=seq(5,20,len=11), lapses=seq(0,0.2, len=11) {
   pmean <- c(lapses=diff_scale$lapserate,sensitivity=diff_scale$sensitivity,diff(diff_scale$scale))
 
   log_posterior <- function(x) {
@@ -204,30 +204,34 @@ grid.eval <- function(diff_scale) {
   }
 
   map.estim <- optim(pmean, log_posterior)$par
-
+  
   design.matrix <- create.design_matrix(diff_scale)
   sc.len <- diff_scale$K - 1
   sc.prior <- ddirichlet(rep(0, sc.len-1),rep(1, sc.len-1), log=TRUE)
-  lps.zero.prior <- dbeta(0.0, 1, 5, log.p=TRUE)
+#  lps.zero.prior <- dbeta(0.0, 1, 5, log.p=TRUE)
 
   sens.prior <- draised(sensitivities, 2.5, 5, 25, 50)
   lps.prior <- dbeta(lapses, 1, 5, log.p=TRUE)
 
+  densities <- expand.grid(scales, sensitivities, lapses)
+  
   for (sc in scales) {
 
     delta.regr <- design.matrix %*% sc
 
-    for (sens in sensitivities) {
+    for (si in 1:len(sensitivities)) {
 
-      decision.prob <- pnorm(sens * delta.regr)
+      decision.prob <- pnorm(sensitivities[si] * delta.regr)
       loglik <- sum(dbinom(resp, 1, decision.prob, log = TRUE))
 
-      density.nolapse <- loglik + sens.prior + sc.prior + lps.zero.prior
-      for (lps in lapses) {
-        loglik.mix <- logSumExp(log(1-lps)+loglik, log(lps) + 0.5)
+#      density.nolapse <- loglik + sens.prior[si] + sc.prior + lps.zero.prior
+      for (li in 1:len(lapses)) {
+        loglik.mix <- logSumExp(log(1-lapses[li])+loglik, log(lapses[li]) + 0.5)
 
-        density <- loglik.mix + sens.prior + lps.prior + sc.prior
+        density <- loglik.mix + sens.prior[si] + lps.prior[li] + sc.prior
       }
     }
   }
+  
+  densities
 }
