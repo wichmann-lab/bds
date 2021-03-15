@@ -1,4 +1,5 @@
 library(rstan)
+library(parallel)
 
 order_data <- function(mlds_data) {
   if (ncol(mlds_data) == 4) {
@@ -159,7 +160,7 @@ convergence.check <- function(stanfit) {
 }
 
 create.design_matrix <- function(diff_scale) {
-  k <- diff_scale$K
+  k <- diff_scale$data$K
 
   expand_row <- function(s1, s2, s3, s4) {
     r <- rep(0, k)
@@ -172,10 +173,10 @@ create.design_matrix <- function(diff_scale) {
     return(r[2:k])
   }
 
-  return(t(mapply(expand_row, diff_scale$S1, diff_scale$S2, diff_scale$S3, diff_scale$S4, SIMPLIFY = TRUE)))
+  return(t(mapply(expand_row, diff_scale$data$S1, diff_scale$data$S2, diff_scale$data$S3, diff_scale$data$S4, SIMPLIFY = TRUE)))
 }
 
-grid.eval <- function(diff_scale, sensitivities=seq(5,20,len=11), lapses=seq(0,0.2, len=11) {
+grid.eval <- function(diff_scale, sensitivities=seq(5,20,len=11), lapses=seq(0,0.2, len=11), cores=detectCores()) {
   pmean <- c(lapses=diff_scale$lapserate,sensitivity=diff_scale$sensitivity,diff(diff_scale$scale))
 
   log_posterior <- function(x) {
@@ -204,34 +205,47 @@ grid.eval <- function(diff_scale, sensitivities=seq(5,20,len=11), lapses=seq(0,0
   }
 
   map.estim <- optim(pmean, log_posterior)$par
-  
+
   design.matrix <- create.design_matrix(diff_scale)
-  sc.len <- diff_scale$K - 1
-  sc.prior <- ddirichlet(rep(0, sc.len-1),rep(1, sc.len-1), log=TRUE)
+  sc.len <- diff_scale$data$K - 1
+#  sc.prior <- log(gtools::ddirichlet(rep(1/sc.len, sc.len),rep(1, sc.len)))
+  sc.prior <- 0
 #  lps.zero.prior <- dbeta(0.0, 1, 5, log.p=TRUE)
 
   sens.prior <- draised(sensitivities, 2.5, 5, 25, 50)
-  lps.prior <- dbeta(lapses, 1, 5, log.p=TRUE)
+  lps.prior <- dbeta(lapses, 1, 5, log=TRUE)
 
-  densities <- expand.grid(scales, sensitivities, lapses)
-  
-  for (sc in scales) {
+  resp <- diff_scale.nodiv$data$Responses
 
+  post.draws <- extract(diff_scale$stanfit,c("lapses", "sensitivity", "psi", "psi_diff"))
+  scales <- post.draws$psi
+
+  densities <- expand.grid(lapses=lapses, sensitivity=sensitivities, scale_index=1:length(scales[,1]), density=0)
+#  ct <- 1
+
+  eval.sens_lps <- function(sci) {
+    sc <- scales[sci,]
     delta.regr <- design.matrix %*% sc
 
-    for (si in 1:len(sensitivities)) {
+    dd <- rep(0, length(sensitivities)*length(lapses))
+    ct <- 1
+
+    for (si in 1:length(sensitivities)) {
 
       decision.prob <- pnorm(sensitivities[si] * delta.regr)
-      loglik <- sum(dbinom(resp, 1, decision.prob, log = TRUE))
+      lik <- dbinom(resp, 1, decision.prob, log = FALSE)
 
 #      density.nolapse <- loglik + sens.prior[si] + sc.prior + lps.zero.prior
-      for (li in 1:len(lapses)) {
-        loglik.mix <- logSumExp(log(1-lapses[li])+loglik, log(lapses[li]) + 0.5)
+      for (li in 1:length(lapses)) {
+        loglik.mix <- log( (1-lapses[li])*lik + 0.5*lapses[li] )
 
-        density <- loglik.mix + sens.prior[si] + lps.prior[li] + sc.prior
+        dd[ct] <- sum(loglik.mix) + sens.prior[si] + lps.prior[li] + sc.prior
+        ct <- ct + 1
       }
     }
+
+    dd
   }
-  
+  densities$density <- as.vector(mcmapply(eval.sens_lps, 1:length(scales[,1]), mc.cores=cores, SIMPLIFY = TRUE))
   densities
 }

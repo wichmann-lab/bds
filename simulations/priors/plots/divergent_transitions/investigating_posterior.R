@@ -10,7 +10,7 @@ diff_scale.nodiv <- bds(sim.nodiv)
 
 plot.diagnostics("nodiv", diff_scale.nodiv)
 
-sc.lp.nodiv <- grid.eval("nodiv", diff_scale.nodiv)
+sc.lp.nodiv <- load.grid("nodiv", diff_scale.nodiv)
 summarize.posterior("nodiv", diff_scale.nodiv, sc.lp.nodiv)
 #animate.posterior_landscape("nodiv", diff_scale.nodiv, sc.lp.nodiv)
 
@@ -32,6 +32,6 @@ diff_scale.div <- bds(sim.div)
 
 plot.diagnostics("div", diff_scale.div)
 
-sc.lp.div <- grid.eval("div", diff_scale.div)
+sc.lp.div <-load.grid("div", diff_scale.div)
 summarize.posterior("div", diff_scale.div, sc.lp.div)
 #animate.posterior_landscape("div", diff_scale.div, sc.lp.div)

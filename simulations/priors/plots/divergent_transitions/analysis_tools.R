@@ -35,7 +35,7 @@ solpal5 <- unname(solpal5)
 #  return(lp)
 #}
 
-grid.eval <- function(name, diff_scale) {
+load.grid <- function(name, diff_scale) {
   log_posterior <- function(x) {
     pars <- list(lapses=x[1], sensitivity=x[2], psi_diff=x[3:length(x)])
     lp <- tryCatch(-log_prob(diff_scale$stanfit, unconstrain_pars(diff_scale$stanfit, pars)),error=function(cond) return(Inf))
@@ -44,34 +44,22 @@ grid.eval <- function(name, diff_scale) {
   }
 
   post.draws <- extract(diff_scale$stanfit,c("lapses", "sensitivity", "psi", "psi_diff"))
-  sens <- seq(2.5, max(post.draws$sensitivity, 30), len=100)
-  lps <- seq(0.001, max(post.draws$lapses, .1), len=100)
+  sens <- seq(2.5, max(post.draws$sensitivity, 30), len=30)
+  lps <- seq(0.001, max(post.draws$lapses, .1), len=30)
   lps.step <- lps[2] - lps[1]
   sens.step <- sens[2] - sens[1]
 
-  v <- expand.grid(lps, sens)
-  
-  sc.lp <- data.frame()
-  
-  lp <- function(sl, psi_diff=pmean[3:length(pmean)]) {
-    x <- c(sl[[1]], sl[[2]], psi_diff)
-    -log_posterior(x)
-  }
-  
-  grid.lps_sens <- function (id) {
-    if (!file.exists(paste0('eval/', name, '_', id, '.tsv'))) {
-    sc <- post.draws$psi_diff[id,]
-    v$lp <- apply(v, 1, lp, psi_diff = sc)
+  if (!file.exists(paste0('eval/', name, '_', id, '.tsv'))) {
+    sc.lp <- grid.eval(diff_scale, sensitivities = sens, lapses=lps)
     
-    write.table(v, file=paste0('eval/', name, '_', id, '.tsv'), sep='\t')
-    } else {
-        v <- read.table(paste0('eval/', name, '_', id, '.tsv'), sep="\t")
-    }
-    
-    matrixStats::logSumExp(v$lp+log(lps.step)+log(sens.step))
+    write.table(sc.lp, file=paste0('eval/', name, '.tsv'), sep='\t')
+  } else {
+    sc.lp <- read.table(paste0('eval/', name, '.tsv'), sep="\t")
   }
-  
-  sc.lp <- mcmapply(grid.lps_sens, 1:length(post.draws$psi_diff[,1]), mc.cores=detectCores())
+    
+  sc.lp$density <- matrixStats::logSumExp(sc.lp$density+log(lps.step)+log(sens.step))
+
+  sc.lp
 }
 
 plot.diagnostics <- function(name, diff_scale) {
