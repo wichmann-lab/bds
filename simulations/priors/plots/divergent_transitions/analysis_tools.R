@@ -44,22 +44,22 @@ load.grid <- function(name, diff_scale) {
   }
 
   post.draws <- extract(diff_scale$stanfit,c("lapses", "sensitivity", "psi", "psi_diff"))
-  sens <- seq(2.5, max(post.draws$sensitivity, 30), len=30)
+  sens <- seq(5, max(post.draws$sensitivity, 30), len=30)
   lps <- seq(0.001, max(post.draws$lapses, .1), len=30)
   lps.step <- lps[2] - lps[1]
   sens.step <- sens[2] - sens[1]
 
-  if (!file.exists(paste0('eval/', name, '_', id, '.tsv'))) {
-    sc.lp <- grid.eval(diff_scale, sensitivities = sens, lapses=lps)
+  if (!file.exists(paste0('eval/', name, '.tsv'))) {
+    lp <- grid.eval(diff_scale, sensitivities = sens, lapses=lps)
     
-    write.table(sc.lp, file=paste0('eval/', name, '.tsv'), sep='\t')
+    write.table(lp, file=paste0('eval/', name, '.tsv'), sep='\t')
   } else {
-    sc.lp <- read.table(paste0('eval/', name, '.tsv'), sep="\t")
+    lp <- read.table(paste0('eval/', name, '.tsv'), sep="\t")
   }
-    
-  sc.lp$density <- matrixStats::logSumExp(sc.lp$density+log(lps.step)+log(sens.step))
+  
+  marginal.lp <- lp %>% group_by(lapses, sensitivity) %>% summarise(density=matrixStats::logSumExp(density)+log(lps.step)+log(sens.step))
 
-  sc.lp
+  marginal.lp
 }
 
 plot.diagnostics <- function(name, diff_scale) {
@@ -141,10 +141,10 @@ plot.diagnostics <- function(name, diff_scale) {
   fill_scale <- scale_fill_viridis_c(name="log likelihood", limits=c(-map2.fit$value - 20, -map2.fit$value), option="inferno", oob=scales::squish)
   
   p.density <- ggplot() + 
-    geom_raster(data=v, aes(x=Var1, y=Var2, fill=-lp)) +
-    geom_contour(data=v, aes(x=Var1, y=Var2, z=-lp), binwidth=5, colour=solpal5[5]) +
-    geom_point(data=data.frame(Var1=post.draws$lapses, Var2=post.draws$sensitivity), aes(x=Var1, y=Var2), alpha=0.1) +
-    geom_point(data=data.frame(Var1=map[1], Var2=map[2]), aes(x=Var1, y=Var2), color=solpal5[1]) +
+    geom_raster(data=v, aes(x=lapses, y=sensitivity, fill=-lp)) +
+    geom_contour(data=v, aes(x=lapses, y=sensitivity, z=-lp), binwidth=5, colour=solpal5[5]) +
+    geom_point(data=data.frame(lapses=post.draws$lapses, sensitivity=post.draws$sensitivity), aes(x=lapses, y=sensitivity), alpha=0.1) +
+    geom_point(data=data.frame(lapses=map[1], sensitivity=map[2]), aes(x=lapses, y=sensitivity), color=solpal5[1]) +
     xlab('lapserate') +
     ylab('sensitivity') +
     theme_classic() +
@@ -188,9 +188,9 @@ animate.posterior_landscape <- function(name, diff_scale, sc.lp) {
     
     smp <- c(post.draws$lapses[id], post.draws$sensitivity[id])
     p <- ggplot() + 
-      geom_raster(data=v, aes(x=Var1, y=Var2, fill=lp)) +
-      geom_contour(data=v, aes(x=Var1, y=Var2, z=lp), binwidth=5, colour=solpal5[5]) +
-      geom_point(data=data.frame(Var1=c(map[1], pmean[1], map2[1], smp[1]), Var2=c(map[2], pmean[2], map2[2], smp[2]), method=c('MAP', 'mean', 'local max', 'HMC sample')), aes(x=Var1, y=Var2, colour=method, shape=method), size=3) +
+      geom_raster(data=v, aes(x=lapses, y=sensitivity, fill=lp)) +
+      geom_contour(data=v, aes(x=lapses, y=sensitivity, z=lp), binwidth=5, colour=solpal5[5]) +
+      geom_point(data=data.frame(lapses=c(map[1], pmean[1], map2[1], smp[1]), sensitivity=c(map[2], pmean[2], map2[2], smp[2]), method=c('MAP', 'mean', 'local max', 'HMC sample')), aes(x=lapses, y=sensitivity, colour=method, shape=method), size=3) +
       xlab('lapserate') +
       ylab('sensitivity') +
       ggtitle(sc.lp[id]) +
@@ -229,24 +229,16 @@ summarize.posterior <- function(name, diff_scale, sc.lp, postfix='_full') {
 
   fill_scale <- scale_fill_viridis_c(name="log likelihood", option="inferno")
 
-  post.lp <- data.frame()
-  for (id in order(sc.lp)) {
-    v <- read.table(paste0('eval/', name, '_', id, '.tsv'), sep="\t")
-    
-    if (nrow(post.lp) == 0) {
-      post.lp <- v
-    } else {
-      post.lp$lp <- log(exp(post.lp$lp) + exp(v$lp))
-    }
-  }
+  post.lp <- load.grid(name, diff_scale)
   
-  means <- c(lps.mean=sum(exp(post.lp$lp)/sum(exp(post.lp$lp))*post.lp$Var1), sens.mean=sum(exp(post.lp$lp)/sum(exp(post.lp$lp))*post.lp$Var2))
+  full_dens <- sum(exp(post.lp$density))
+  means <- c(lps.mean=sum(exp(post.lp$density)/full_dens*post.lp$lapses), sens.mean=sum(exp(post.lp$density)/full_dens*post.lp$sensitivity))
   
   p <- ggplot() + 
-    geom_raster(data=post.lp, aes(x=Var1, y=Var2, fill=lp)) +
-    geom_point(data=data.frame(Var1=post.draws$lapses, Var2=post.draws$sensitivity), aes(x=Var1, y=Var2), alpha=0.1) +
-    geom_contour(data=post.lp, aes(x=Var1, y=Var2, z=lp), binwidth=5, colour=solpal5[5]) +
-    geom_point(data=data.frame(Var1=c(map[1], pmean[1], means[1]), Var2=c(map[2], pmean[2], means[2]), method=c('MAP', 'sample mean', 'posterior mean')), aes(x=Var1, y=Var2, colour=method, shape=method), size=3) +
+    geom_raster(data=post.lp, aes(x=lapses, y=sensitivity, fill=density)) +
+    geom_point(data=data.frame(lapses=post.draws$lapses, sensitivity=post.draws$sensitivity), aes(x=lapses, y=sensitivity), alpha=0.1) +
+    geom_contour(data=post.lp, aes(x=lapses, y=sensitivity, z=density), binwidth=5, colour=solpal5[5]) +
+    geom_point(data=data.frame(lapses=c(map[1], pmean[1], means[1]), sensitivity=c(map[2], pmean[2], means[2]), method=c('MAP', 'sample mean', 'posterior mean')), aes(x=lapses, y=sensitivity, colour=method, shape=method), size=3) +
     xlab('lapserate') +
     ylab('sensitivity') +
     ggtitle(name) +

@@ -215,7 +215,7 @@ grid.eval <- function(diff_scale, sensitivities=seq(5,20,len=11), lapses=seq(0,0
   sens.prior <- draised(sensitivities, 2.5, 5, 25, 50)
   lps.prior <- dbeta(lapses, 1, 5, log=TRUE)
 
-  resp <- diff_scale.nodiv$data$Responses
+  resp <- diff_scale$data$Responses
 
   post.draws <- extract(diff_scale$stanfit,c("lapses", "sensitivity", "psi", "psi_diff"))
   scales <- post.draws$psi

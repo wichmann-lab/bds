@@ -6,7 +6,7 @@ setwd("~/Projects/bds/simulations/priors/plots/divergent_transitions/")
 load("~/Projects/bds/simulations/priors/plots/divergent_transitions/demo-square-11-330-10-0.01-virt_exp.RData")
 
 adapt_delta = c(0.8, 0.9, 0.99, 0.999, 0.9999, 0.99999, 0.999999, 0.9999999)
-sims = c(20) 
+sims = 1:length(sim.lst$simulations)
 ad.div.data <- data.frame()
 
 for (s in sims) {
@@ -14,8 +14,7 @@ for (s in sims) {
 
   diff_scale <- bds(sim.div)
   
-#  sc.lp.div <- grid.eval(paste0('div', s), diff_scale)
-  sc.lp.div <- grid.eval('div', diff_scale)
+#  sc.lp.div <- load.grid(paste0('square-trials=330-sens=10-lps=0.01-sim=', s), diff_scale)
   
   for (ad in adapt_delta) {
 
@@ -31,16 +30,14 @@ for (s in sims) {
                     sim=s)
     ad.div.data <- rbind(ad.div.data, df)
     
-#    summarize.posterior(paste0('div',s), diff_scale, sc.lp.div, postfix=paste0('_', ad))
-    summarize.posterior('div', diff_scale, sc.lp.div, postfix=paste0('_', ad))
+#    summarize.posterior(paste0('square-trials=330-sens=10-lps=0.01-sim=', s), diff_scale, sc.lp.div, postfix=paste0('-adapt_delta=', ad))
   }
 }
 
-ad.div.plot <- ggplot(ad.div.data, aes(x=adapt_delta, y=divergence/10000)) +
-  geom_point() +
-  geom_line() +
+ad.div.plot <- ggplot(ad.div.data, aes(x=factor(adapt_delta), y=divergence/10000)) +
+  geom_violin() +
   ylim(0, NA) +
-  scale_x_continuous(trans='log') +
+#  scale_x_continuous(trans='log') +
   theme_classic()
   
 ggsave('adapt_delta_divergence.pdf', ad.div.plot)
