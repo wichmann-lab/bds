@@ -42,7 +42,9 @@ bds <- function(mlds_data,
                 stimulus=NULL,
                 fit.lapses=TRUE,
                 .cores=getOption('mc.cores', default = 1L),
-		adapt_delta=0.9) {
+		            adapt_delta=0.9,
+		            stepsize=1,
+		            max_treedepth=10) {
 
   if (is.null(stimulus)) {
     if (ncol(mlds_data) == 4) {
@@ -74,7 +76,11 @@ bds <- function(mlds_data,
 
   model_obj <- stan_model(model_code=md$model_code)
 
-  stanfit <- sample_bds_model(model_obj, mlds_data, prior_params=md$default_params, init_list = rep(list(init_fun()), times=4), .cores=.cores, adapt_delta=adapt_delta)
+  stanfit <- sample_bds_model(model_obj,
+                              mlds_data,
+                              prior_params=md$default_params,
+                              init_list = rep(list(init_fun()), times=4),
+                              .cores=.cores, adapt_delta=adapt_delta, stepsize=stepsize, max_treedepth=max_treedepth)
 
   md$extractor(stanfit$stanfit, stimulus, stanfit$data)
 }
@@ -84,7 +90,9 @@ sample_bds_model <- function(model_obj,
                              prior_params,
                              init_list,
                              .cores=getOption('mc.cores', default = 1L),
-			     adapt_delta=0.9) {
+			                       adapt_delta=0.9,
+			                       stepsize=1,
+			                       max_treedepth=10) {
   mlds_data.ordered <- order_data(mlds_data)
 
   data = c(list(N = length(mlds_data[,1])),
@@ -113,7 +121,7 @@ sample_bds_model <- function(model_obj,
                   warmup = 1000,
                   iter = 3500, chains=length(init_list),
 #                  include = FALSE, pars = c("psi_ext", "decision"),
-                  control = list(adapt_delta = adapt_delta),
+                  control = list(adapt_delta = adapt_delta, stepsize=stepsize, max_treedepth=max_treedepth),
                   init=init_list,
                   cores=.cores)
 
@@ -176,16 +184,19 @@ create.design_matrix <- function(diff_scale) {
   return(t(mapply(expand_row, diff_scale$data$S1, diff_scale$data$S2, diff_scale$data$S3, diff_scale$data$S4, SIMPLIFY = TRUE)))
 }
 
-grid.eval <- function(diff_scale, sensitivities=seq(5,20,len=11), lapses=seq(0,0.2, len=11), cores=detectCores()) {
-  pmean <- c(lapses=diff_scale$lapserate,sensitivity=diff_scale$sensitivity,diff(diff_scale$scale))
+##
+#
+#
+#
+grid.eval <- function(diff_scale,
+                      sensitivities=seq(5,20,len=11),
+                      lapses=seq(0,0.2, len=11),
+                      cores=detectCores()) {
 
-  log_posterior <- function(x) {
-    pars <- list(lapses=x[1], sensitivity=x[2], psi_diff=x[3:length(x)])
-    lp <- tryCatch(-log_prob(diff_scale$stanfit, unconstrain_pars(diff_scale$stanfit, pars)),error=function(cond) return(Inf))
+  # Sample mean of HMC
+#  pmean <- c(lapses=diff_scale$lapserate,sensitivity=diff_scale$sensitivity,diff(diff_scale$scale))
 
-    return(lp)
-  }
-
+  # evaluates raised cosine prior density with parameters 'start', 'u1', 'u2', and 'end' at point 'y'
   draised.single <- function(y, start, u1, u2, end) {
     if (start < y && y < u1) {
       res = log(0.5-0.5*cos(pi/(u1-start)*(y-start)));
@@ -200,12 +211,12 @@ grid.eval <- function(diff_scale, sensitivities=seq(5,20,len=11), lapses=seq(0,0
     res
   }
 
+  # vectorized version of raised cosine prior density
   draised <- function(x, a, b, c, d) {
     return(sapply(x, draised.single, start=a, u1=b, u2=c, end=d))
   }
 
-  map.estim <- optim(pmean, log_posterior)$par
-
+  # Prepare
   design.matrix <- create.design_matrix(diff_scale)
   sc.len <- diff_scale$data$K - 1
 #  sc.prior <- log(gtools::ddirichlet(rep(1/sc.len, sc.len),rep(1, sc.len)))
@@ -217,12 +228,19 @@ grid.eval <- function(diff_scale, sensitivities=seq(5,20,len=11), lapses=seq(0,0
 
   resp <- diff_scale$data$Responses
 
+  # Extract the sampled scales from the Stan model
   post.draws <- extract(diff_scale$stanfit,c("lapses", "sensitivity", "psi", "psi_diff"))
   scales <- post.draws$psi
 
-  densities <- expand.grid(lapses=lapses, sensitivity=sensitivities, scale_index=1:length(scales[,1]), density=0)
+  # Create the data frame to store the end result
+  densities <- expand.grid(lapses=lapses,
+                           sensitivity=sensitivities,
+                           scale_index=1:length(scales[,1]),
+                           density=0)
 #  ct <- 1
 
+  # Evaluate the log posterior density for scale with index sci
+  # on the sensitivity and lapses grid
   eval.sens_lps <- function(sci) {
     sc <- scales[sci,]
     delta.regr <- design.matrix %*% sc
@@ -246,6 +264,8 @@ grid.eval <- function(diff_scale, sensitivities=seq(5,20,len=11), lapses=seq(0,0
 
     dd
   }
-  densities$density <- as.vector(mcmapply(eval.sens_lps, 1:length(scales[,1]), mc.cores=cores, SIMPLIFY = TRUE))
+  densities$density <- as.vector(mcmapply(eval.sens_lps,
+                                          1:length(scales[,1]),
+                                          mc.cores=cores, SIMPLIFY = TRUE))
   densities
 }
